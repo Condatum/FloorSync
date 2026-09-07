@@ -1,0 +1,55 @@
+{% extends 'base.html' %}
+
+{% block title %}FloorSync — Home Screen{% endblock %}
+{% block card_class %}wide{% endblock %}
+
+{% block content %}
+<div class="home-container" style="text-align: center;">
+    <div style="display: inline-block; padding: 0.35rem 0.85rem; background: rgba(16, 185, 129, 0.15); border: 1px solid #10b981; border-radius: 9999px; color: #6ee7b7; font-size: 0.8rem; font-weight: 600; margin-bottom: 1.25rem;">
+        &bull; Authenticated Session Active
+    </div>
+
+    <!-- Exact requirement: Can just render "HOME SCREEN" as the page body -->
+    <h1 class="page-title" style="font-size: 2.25rem; letter-spacing: 0.05em; margin-bottom: 0.5rem;" id="home-screen-heading">
+        HOME SCREEN
+    </h1>
+    <p class="page-subtitle" style="margin-bottom: 2rem;">
+        Welcome to the <strong>FloorSync</strong> staff management hub.
+    </p>
+
+    <div style="background-color: var(--bg-secondary); border: 1px solid var(--bg-card-border); border-radius: 12px; padding: 1.5rem; text-align: left; margin-bottom: 2rem;">
+        <h3 style="font-size: 1rem; color: #c4b5fd; margin-bottom: 1rem; text-transform: uppercase; letter-spacing: 0.05em;">Staff Session Details</h3>
+        <div style="display: grid; grid-template-columns: 140px 1fr; gap: 0.75rem; font-size: 0.95rem;">
+            <div style="color: var(--text-secondary);">Username:</div>
+            <div style="font-weight: 600; color: #67e8f9;" id="staff-username">{{ user.username }}</div>
+
+            <div style="color: var(--text-secondary);">Email:</div>
+            <div>{{ user.email|default:"No email registered" }}</div>
+
+            <div style="color: var(--text-secondary);">Access Level:</div>
+            <div>
+                {% if user.is_superuser %}
+                    <span style="color: #fca5a5; font-weight: 600;">Super Admin</span>
+                {% elif user.is_staff %}
+                    <span style="color: #c4b5fd; font-weight: 600;">Staff Member</span>
+                {% else %}
+                    <span style="color: #6ee7b7; font-weight: 600;">Venue Staff (Tier 1)</span>
+                {% endif %}
+            </div>
+
+            <div style="color: var(--text-secondary);">Status:</div>
+            <div style="color: #6ee7b7;">Active & Authenticated</div>
+        </div>
+    </div>
+
+    <div style="padding: 1rem; background: rgba(139, 92, 246, 0.08); border: 1px dashed rgba(139, 92, 246, 0.35); border-radius: 8px; font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 2rem; line-height: 1.6;">
+        <em>Note:</em> Authentication scaffolding is verified. Full nightlife floor-plan features (live VIP/Regular table toggles and contact routing) will be integrated in subsequent assignment phases.
+    </div>
+
+    <div style="display: flex; gap: 1rem; justify-content: center;">
+        <a href="{% url 'logout' %}" class="btn-primary" style="max-width: 220px; background: linear-gradient(135deg, #ef4444, #dc2626); box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);" id="btn-logout">
+            Log Out of Session
+        </a>
+    </div>
+</div>
+{% endblock %}

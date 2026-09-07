@@ -1,0 +1,51 @@
+{% extends 'base.html' %}
+
+{% block title %}FloorSync — Staff Registration{% endblock %}
+
+{% block content %}
+<div class="auth-box">
+    <h1 class="page-title">FloorSync — Staff Registration</h1>
+    <p class="page-subtitle">Create a staff account to access venue tables and status controls.</p>
+
+    <form method="post" action="{% url 'register' %}">
+        {% csrf_token %}
+
+        {% if form.non_field_errors %}
+            <div class="alert-box alert-error">
+                <div>
+                    {% for error in form.non_field_errors %}
+                        <div>{{ error }}</div>
+                    {% endfor %}
+                </div>
+            </div>
+        {% endif %}
+
+        {% for field in form %}
+            <div class="form-group">
+                <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {{ field }}
+                {% if field.help_text %}
+                    <div class="field-help-text">{{ field.help_text|safe }}</div>
+                {% endif %}
+                {% if field.errors %}
+                    <ul class="field-error-text">
+                        {% for error in field.errors %}
+                            <li>{{ error }}</li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+            </div>
+        {% endfor %}
+
+        <button type="submit" class="btn-primary" id="btn-register">Register Staff Account</button>
+    </form>
+
+    <div class="nav-switch-box">
+        <span>Already have an account?</span>
+        <a href="{% url 'login' %}" class="nav-link" id="link-to-login">Already have an account? Log in</a>
+        <div>
+            <a href="{% url 'login' %}" class="nav-button-link" id="btn-to-login">&larr; Return to Staff Login</a>
+        </div>
+    </div>
+</div>
+{% endblock %}
