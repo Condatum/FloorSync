@@ -1,0 +1,275 @@
+// =====================================================================
+// FloorSync — Physical ERD (dbdiagram.io / DBML source)
+// Target DBMS: PostgreSQL 15 (Supabase)
+// Paste this whole file into https://dbdiagram.io/d to render the ERD.
+// Naming follows Django's physical convention: <app_label>_<modelname>
+// =====================================================================
+
+Project FloorSync {
+  database_type: 'PostgreSQL'
+  Note: 'Live floor-plan + table-status system for single-venue nightlife operations.'
+}
+
+// ---------------------------------------------------------------------
+// 1. IDENTITY & ACCESS  (Hierarchical Access Control / Gatekeeper Reg.)
+// ---------------------------------------------------------------------
+
+Table auth_user {
+  id            bigint       [pk, increment, note: 'PK']
+  password      varchar(128) [not null, note: 'PBKDF2 hash — never plaintext']
+  last_login    timestamptz  [null]
+  is_superuser  boolean      [not null, default: false]
+  username      varchar(150) [not null, unique]
+  first_name    varchar(150) [not null, default: '']
+  last_name     varchar(150) [not null, default: '']
+  email         varchar(254) [not null]
+  is_staff      boolean      [not null, default: false]
+  is_active     boolean      [not null, default: false, note: 'GATEKEEPER FLAG: false until a Super Admin vets the account']
+  date_joined   timestamptz  [not null, default: `now()`]
+
+  Note: 'Django contrib.auth user table. Root identity for every staff member.'
+}
+
+Table staff_staffaccount {
+  id                  bigint       [pk, increment]
+  user_id             bigint       [not null, unique, note: 'FK -> auth_user.id  (1:1, ON DELETE CASCADE)']
+  role                varchar(20)  [not null, default: 'STAFF', note: 'CHECK IN (SUPER_ADMIN, STAFF)']
+  verification_status varchar(20)  [not null, default: 'PENDING', note: 'CHECK IN (PENDING, APPROVED, REJECTED)']
+  employee_no         varchar(20)  [null, unique]
+  contact_number      varchar(20)  [not null, default: '']
+  requested_at        timestamptz  [not null, default: `now()`]
+  verified_by_id      bigint       [null, note: 'FK -> auth_user.id  (the Super Admin who vetted)']
+  verified_at         timestamptz  [null]
+  rejection_reason    varchar(255) [not null, default: '']
+
+  Indexes {
+    (verification_status, role)
+    verified_by_id
+  }
+  Note: 'Two-tier access control + manual vetting queue.'
+}
+
+Table profile_profile {
+  id            bigint       [pk, increment]
+  user_id       bigint       [not null, unique, note: 'FK -> auth_user.id  (1:1, ON DELETE CASCADE)']
+  full_name     varchar(150) [not null, default: '']
+  bio           text         [not null, default: '']
+  profile_image varchar(100) [null, note: 'Relative media path']
+}
+
+Table user_settings_usersettings {
+  id                  bigint  [pk, increment]
+  user_id             bigint  [not null, unique, note: 'FK -> auth_user.id  (1:1, ON DELETE CASCADE)']
+  dark_mode           boolean [not null, default: false]
+  email_notifications boolean [not null, default: true]
+}
+
+Table staff_contactchannel {
+  id            bigint       [pk, increment]
+  staff_id      bigint       [not null, note: 'FK -> auth_user.id']
+  channel_type  varchar(20)  [not null, note: 'CHECK IN (MESSENGER, VIBER, WHATSAPP, SMS, CALL)']
+  handle_or_url varchar(255) [not null, note: 'Deep link used by One-Tap Connect']
+  is_primary    boolean      [not null, default: false]
+  is_active     boolean      [not null, default: true]
+
+  Indexes {
+    (staff_id, channel_type) [unique]
+  }
+  Note: 'Direct Concierge Integration — the tap targets.'
+}
+
+Table staff_dutyshift {
+  id                 bigint      [pk, increment]
+  venue_id           bigint      [not null, note: 'FK -> venue_venue.id']
+  staff_id           bigint      [not null, note: 'FK -> auth_user.id']
+  contact_channel_id bigint      [null, note: 'FK -> staff_contactchannel.id']
+  started_at         timestamptz [not null, default: `now()`]
+  ended_at           timestamptz [null]
+  is_active          boolean     [not null, default: true]
+
+  Indexes {
+    (venue_id, is_active)
+    (staff_id, started_at)
+  }
+  Note: 'Duty-Based Contact. Partial unique index enforces ONE active shift per venue.'
+}
+
+// ---------------------------------------------------------------------
+// 2. SPATIAL MODEL  (Dynamic Spatial Mapping / Spatial Management)
+// ---------------------------------------------------------------------
+
+Table venue_venue {
+  id              bigint       [pk, increment]
+  name            varchar(120) [not null, unique]
+  address         varchar(255) [not null, default: '']
+  hotline         varchar(20)  [not null, default: '']
+  opening_time    time         [null]
+  closing_time    time         [null]
+  is_active       boolean      [not null, default: true]
+  created_at      timestamptz  [not null, default: `now()`]
+
+  Note: 'Single-Venue Logic: exactly one active row in the current scope.'
+}
+
+Table venue_floorplan {
+  id               bigint       [pk, increment]
+  venue_id         bigint       [not null, note: 'FK -> venue_venue.id']
+  name             varchar(120) [not null, note: 'e.g. "Standard Night", "NYE 2026 Layout"']
+  version          integer      [not null, default: 1]
+  background_image varchar(100) [null]
+  canvas_width     integer      [not null, default: 1200]
+  canvas_height    integer      [not null, default: 800]
+  is_published     boolean      [not null, default: false, note: 'Only ONE published plan renders on the public map']
+  created_by_id    bigint       [null, note: 'FK -> auth_user.id (Super Admin)']
+  created_at       timestamptz  [not null, default: `now()`]
+  updated_at       timestamptz  [not null, default: `now()`]
+
+  Indexes {
+    (venue_id, name, version) [unique]
+  }
+}
+
+Table venue_zone {
+  id            bigint      [pk, increment]
+  floor_plan_id bigint      [not null, note: 'FK -> venue_floorplan.id']
+  name          varchar(80) [not null, note: 'e.g. "VIP Mezzanine", "Regular — Dancefloor"']
+  zone_type     varchar(20) [not null, note: 'CHECK IN (VIP, REGULAR)']
+  display_color varchar(7)  [not null, default: '#7C3AED']
+  sort_order    smallint    [not null, default: 0]
+
+  Indexes {
+    (floor_plan_id, name) [unique]
+  }
+}
+
+Table venue_table {
+  id                    bigint        [pk, increment]
+  zone_id               bigint        [not null, note: 'FK -> venue_zone.id']
+  code                  varchar(20)   [not null, note: 'e.g. VIP-01']
+  label                 varchar(60)   [not null, default: '']
+  capacity              smallint      [not null, note: 'CHECK capacity > 0']
+  min_spend             numeric(10,2) [not null, default: 0, note: 'CHECK min_spend >= 0 (PHP)']
+  shape                 varchar(15)   [not null, default: 'RECT', note: 'CHECK IN (RECT, CIRCLE, BOOTH)']
+  pos_x                 numeric(7,2)  [not null, note: 'Canvas X coordinate']
+  pos_y                 numeric(7,2)  [not null, note: 'Canvas Y coordinate']
+  width                 numeric(7,2)  [not null, default: 80]
+  height                numeric(7,2)  [not null, default: 60]
+  rotation              smallint      [not null, default: 0]
+  status                varchar(15)   [not null, default: 'AVAILABLE', note: 'CHECK IN (AVAILABLE, OCCUPIED, RESERVED, BLOCKED)']
+  status_updated_at     timestamptz   [null]
+  status_updated_by_id  bigint        [null, note: 'FK -> auth_user.id']
+  is_visible            boolean       [not null, default: true]
+  notes                 varchar(255)  [not null, default: '']
+
+  Indexes {
+    (zone_id, code) [unique]
+    status
+  }
+  Note: 'Current status is stored here (denormalized) so the public map is a single fast read.'
+}
+
+Table venue_perk {
+  id          bigint       [pk, increment]
+  name        varchar(60)  [not null, unique, note: 'e.g. "Beside DJ Booth", "Dancefloor View"']
+  icon        varchar(40)  [not null, default: '']
+  description varchar(255) [not null, default: '']
+  Note: 'Lookup table for Contextual Table Intelligence (proximity perks).'
+}
+
+Table venue_tableperk {
+  id       bigint [pk, increment]
+  table_id bigint [not null, note: 'FK -> venue_table.id']
+  perk_id  bigint [not null, note: 'FK -> venue_perk.id']
+
+  Indexes {
+    (table_id, perk_id) [unique]
+  }
+  Note: 'Junction table resolving the M:N between tables and perks.'
+}
+
+// ---------------------------------------------------------------------
+// 3. TRANSACTIONS & AUDIT  (Verified Workflow / Reservation Log)
+// ---------------------------------------------------------------------
+
+Table reservations_reservation {
+  id               bigint        [pk, increment]
+  table_id         bigint        [not null, note: 'FK -> venue_table.id']
+  reference_code   varchar(12)   [not null, unique]
+  guest_name       varchar(120)  [not null]
+  guest_contact    varchar(50)   [not null]
+  party_size       smallint      [not null, note: 'CHECK party_size > 0']
+  reserved_for     timestamptz   [not null, note: 'Service date/time']
+  deposit_amount   numeric(10,2) [not null, default: 0]
+  payment_verified boolean       [not null, default: false, note: 'Off-app settlement manually confirmed by staff']
+  status           varchar(15)   [not null, default: 'HELD', note: 'CHECK IN (HELD, CONFIRMED, SEATED, COMPLETED, CANCELLED, NO_SHOW)']
+  created_by_id    bigint        [not null, note: 'FK -> auth_user.id — Mediated Bookings: always a staff member']
+  created_at       timestamptz   [not null, default: `now()`]
+  updated_at       timestamptz   [not null, default: `now()`]
+  remarks          text          [not null, default: '']
+
+  Indexes {
+    (table_id, reserved_for)
+    status
+  }
+}
+
+Table reservations_tablestatuslog {
+  id              bigint       [pk, increment]
+  table_id        bigint       [not null, note: 'FK -> venue_table.id']
+  reservation_id  bigint       [null, note: 'FK -> reservations_reservation.id (nullable: not every toggle is a booking)']
+  previous_status varchar(15)  [not null]
+  new_status      varchar(15)  [not null]
+  changed_by_id   bigint       [null, note: 'FK -> auth_user.id  (ON DELETE SET NULL — the log outlives the account)']
+  changed_at      timestamptz  [not null, default: `now()`]
+  source          varchar(20)  [not null, default: 'ADMIN_HUB', note: 'CHECK IN (ADMIN_HUB, LAYOUT_EDIT, SYSTEM)']
+  note            varchar(255) [not null, default: '']
+  ip_address      inet         [null]
+
+  Indexes {
+    (table_id, changed_at)
+    changed_by_id
+  }
+  Note: 'Append-only Audit Trail. Never updated, never deleted.'
+}
+
+// ---------------------------------------------------------------------
+// 4. EMPIRICAL VALIDATION  (15-subject usability study)
+// ---------------------------------------------------------------------
+
+Table feedback_usabilityresponse {
+  id                      bigint       [pk, increment]
+  participant_code        varchar(10)  [not null, unique, note: 'Anonymised, e.g. P-07']
+  participant_type        varchar(10)  [not null, note: 'CHECK IN (STAFF, PATRON)']
+  sus_score               numeric(5,2) [null, note: 'CHECK 0..100']
+  task_completion_seconds integer      [null]
+  clarity_rating          smallint     [null, note: 'CHECK 1..5']
+  comments                text         [not null, default: '']
+  submitted_at            timestamptz  [not null, default: `now()`]
+}
+
+// ---------------------------------------------------------------------
+// RELATIONSHIPS  ( - = 1:1 ,  > = many-to-one ,  < = one-to-many )
+// ---------------------------------------------------------------------
+
+Ref: profile_profile.user_id            - auth_user.id            // 1:1
+Ref: user_settings_usersettings.user_id - auth_user.id            // 1:1
+Ref: staff_staffaccount.user_id         - auth_user.id            // 1:1
+Ref: staff_staffaccount.verified_by_id  > auth_user.id            // M:1 (vetted by)
+Ref: staff_contactchannel.staff_id      > auth_user.id            // M:1
+Ref: staff_dutyshift.staff_id           > auth_user.id            // M:1
+Ref: staff_dutyshift.venue_id           > venue_venue.id          // M:1
+Ref: staff_dutyshift.contact_channel_id > staff_contactchannel.id // M:1
+
+Ref: venue_floorplan.venue_id           > venue_venue.id          // M:1
+Ref: venue_floorplan.created_by_id      > auth_user.id            // M:1
+Ref: venue_zone.floor_plan_id           > venue_floorplan.id      // M:1
+Ref: venue_table.zone_id                > venue_zone.id           // M:1
+Ref: venue_table.status_updated_by_id   > auth_user.id            // M:1
+Ref: venue_tableperk.table_id           > venue_table.id          // M:1
+Ref: venue_tableperk.perk_id            > venue_perk.id           // M:1
+
+Ref: reservations_reservation.table_id       > venue_table.id     // M:1
+Ref: reservations_reservation.created_by_id  > auth_user.id       // M:1
+Ref: reservations_tablestatuslog.table_id       > venue_table.id  // M:1
+Ref: reservations_tablestatuslog.reservation_id > reservations_reservation.id // M:1
+Ref: reservations_tablestatuslog.changed_by_id  > auth_user.id    // M:1

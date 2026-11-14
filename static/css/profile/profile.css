@@ -1,0 +1,10 @@
+/* Profile feature-specific presentation */
+.profile-box {
+    text-align: left;
+}
+
+.profile-box .feature-icon {
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+}

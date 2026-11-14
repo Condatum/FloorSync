@@ -1,0 +1,10 @@
+/* Settings feature-specific presentation */
+.settings-box {
+    text-align: left;
+}
+
+.settings-box .feature-icon {
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+}

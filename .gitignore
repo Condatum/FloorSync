@@ -4,9 +4,15 @@ venv/
 ENV/
 env/
 
+# Environment secrets
+.env
+
 # Databases
 *.sqlite3
 *.db
+
+# Uploaded media
+media/
 
 # Python bytecode & cache
 __pycache__/

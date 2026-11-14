@@ -1,23 +1,23 @@
 """
 URL configuration for floorsync_project project.
 
-The `urlpatterns` list routes URLs to views. For more information please see:
-    https://docs.djangoproject.com/en/6.1/topics/http/urls/
-Examples:
-Function views
-    1. Add an import:  from my_app import views
-    2. Add a URL to urlpatterns:  path('', views.home, name='home')
-Class-based views
-    1. Add an import:  from other_app.views import Home
-    2. Add a URL to urlpatterns:  path('', Home.as_view(), name='home')
-Including another URLconf
-    1. Import the include() function: from django.urls import include, path
-    2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
+Feature apps are mounted under their own prefix and namespace (vertical slicing).
+`root` and `logout` stay as flat, cross-cutting routes since they are shared by
+every feature rather than owned by a single one.
 """
 from django.contrib import admin
-from django.urls import path, include
+from django.urls import include, path
+
+from apps.home.views import root_view
+from apps.login.views import logout_view
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('', include('accounts.urls')),
+    path('', root_view, name='root'),
+    path('logout/', logout_view, name='logout'),
+    path('login/', include('apps.login.urls')),
+    path('register/', include('apps.register.urls')),
+    path('profile/', include('apps.profile.urls')),
+    path('settings/', include('apps.user_settings.urls')),
+    path('', include('apps.home.urls')),
 ]

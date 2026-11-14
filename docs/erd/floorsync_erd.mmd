@@ -1,0 +1,194 @@
+%% FloorSync — Physical ERD (Mermaid source)
+%% Render at https://mermaid.live  ->  Actions -> PNG / SVG
+%% Crow's foot notation.  || exactly one   |o zero-or-one   o{ zero-or-many   |{ one-or-many
+erDiagram
+    auth_user                  ||--o| profile_profile             : "owns"
+    auth_user                  ||--o| user_settings_usersettings  : "configures"
+    auth_user                  ||--o| staff_staffaccount          : "is credentialed as"
+    auth_user                  ||--o{ staff_staffaccount          : "vets"
+    auth_user                  ||--o{ staff_contactchannel        : "publishes"
+    auth_user                  ||--o{ staff_dutyshift             : "works"
+    auth_user                  ||--o{ venue_floorplan             : "authors"
+    auth_user                  ||--o{ venue_table                 : "last toggled"
+    auth_user                  ||--o{ reservations_reservation    : "records"
+    auth_user                  ||--o{ reservations_tablestatuslog : "authorizes"
+
+    venue_venue                ||--|{ venue_floorplan             : "is laid out by"
+    venue_venue                ||--o{ staff_dutyshift             : "is staffed by"
+    staff_contactchannel       ||--o{ staff_dutyshift             : "routes guests to"
+    venue_floorplan            ||--|{ venue_zone                  : "is divided into"
+    venue_zone                 ||--o{ venue_table                 : "contains"
+    venue_table                ||--o{ venue_tableperk             : "is tagged by"
+    venue_perk                 ||--o{ venue_tableperk             : "applies to"
+    venue_table                ||--o{ reservations_reservation    : "is booked as"
+    venue_table                ||--o{ reservations_tablestatuslog : "is audited by"
+    reservations_reservation   ||--o{ reservations_tablestatuslog : "explains"
+
+    auth_user {
+        bigint      id           PK "identity"
+        varchar     username     UK "unique login"
+        varchar     password        "PBKDF2 hash"
+        varchar     email
+        varchar     first_name
+        varchar     last_name
+        boolean     is_active       "FALSE until vetted"
+        boolean     is_staff
+        boolean     is_superuser
+        timestamptz last_login
+        timestamptz date_joined
+    }
+
+    staff_staffaccount {
+        bigint      id                  PK
+        bigint      user_id             FK "UNIQUE - 1:1 to auth_user"
+        varchar     role                   "SUPER_ADMIN or STAFF"
+        varchar     verification_status    "PENDING APPROVED REJECTED"
+        varchar     employee_no         UK
+        varchar     contact_number
+        timestamptz requested_at
+        bigint      verified_by_id      FK "Super Admin who approved"
+        timestamptz verified_at
+        varchar     rejection_reason
+    }
+
+    profile_profile {
+        bigint  id            PK
+        bigint  user_id       FK "UNIQUE - 1:1 to auth_user"
+        varchar full_name
+        text    bio
+        varchar profile_image    "media path"
+    }
+
+    user_settings_usersettings {
+        bigint  id                  PK
+        bigint  user_id             FK "UNIQUE - 1:1 to auth_user"
+        boolean dark_mode
+        boolean email_notifications
+    }
+
+    staff_contactchannel {
+        bigint  id            PK
+        bigint  staff_id      FK
+        varchar channel_type     "MESSENGER VIBER WHATSAPP SMS CALL"
+        varchar handle_or_url    "One-Tap Connect deep link"
+        boolean is_primary
+        boolean is_active
+    }
+
+    staff_dutyshift {
+        bigint      id                 PK
+        bigint      venue_id           FK
+        bigint      staff_id           FK
+        bigint      contact_channel_id FK
+        timestamptz started_at
+        timestamptz ended_at
+        boolean     is_active             "one active shift per venue"
+    }
+
+    venue_venue {
+        bigint      id           PK
+        varchar     name         UK
+        varchar     address
+        varchar     hotline
+        time        opening_time
+        time        closing_time
+        boolean     is_active
+        timestamptz created_at
+    }
+
+    venue_floorplan {
+        bigint      id               PK
+        bigint      venue_id         FK
+        varchar     name                "part of UNIQUE with version"
+        integer     version
+        varchar     background_image
+        integer     canvas_width
+        integer     canvas_height
+        boolean     is_published        "only one drives the map"
+        bigint      created_by_id    FK
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    venue_zone {
+        bigint   id            PK
+        bigint   floor_plan_id FK
+        varchar  name             "UNIQUE per plan"
+        varchar  zone_type        "VIP or REGULAR"
+        varchar  display_color
+        smallint sort_order
+    }
+
+    venue_table {
+        bigint      id                   PK
+        bigint      zone_id              FK
+        varchar     code                    "UNIQUE per zone"
+        varchar     label
+        smallint    capacity                "seats"
+        numeric     min_spend               "PHP 10 2"
+        varchar     shape                   "RECT CIRCLE BOOTH"
+        numeric     pos_x
+        numeric     pos_y
+        numeric     width
+        numeric     height
+        smallint    rotation
+        varchar     status                  "AVAILABLE OCCUPIED RESERVED BLOCKED"
+        timestamptz status_updated_at
+        bigint      status_updated_by_id FK
+        boolean     is_visible
+        varchar     notes
+    }
+
+    venue_perk {
+        bigint  id          PK
+        varchar name        UK "Beside DJ Booth etc"
+        varchar icon
+        varchar description
+    }
+
+    venue_tableperk {
+        bigint id       PK
+        bigint table_id FK "UNIQUE with perk_id"
+        bigint perk_id  FK
+    }
+
+    reservations_reservation {
+        bigint      id               PK
+        bigint      table_id         FK
+        varchar     reference_code   UK
+        varchar     guest_name
+        varchar     guest_contact
+        smallint    party_size
+        timestamptz reserved_for
+        numeric     deposit_amount      "PHP 10 2"
+        boolean     payment_verified    "off-app settlement confirmed"
+        varchar     status              "HELD CONFIRMED SEATED COMPLETED CANCELLED NO_SHOW"
+        bigint      created_by_id    FK "always a staff member"
+        timestamptz created_at
+        timestamptz updated_at
+        text        remarks
+    }
+
+    reservations_tablestatuslog {
+        bigint      id              PK
+        bigint      table_id        FK
+        bigint      reservation_id  FK "nullable"
+        varchar     previous_status
+        varchar     new_status
+        bigint      changed_by_id   FK "SET NULL - log outlives account"
+        timestamptz changed_at
+        varchar     source             "ADMIN_HUB LAYOUT_EDIT SYSTEM"
+        varchar     note
+        inet        ip_address
+    }
+
+    feedback_usabilityresponse {
+        bigint      id                      PK
+        varchar     participant_code        UK "anonymised P-01 to P-15"
+        varchar     participant_type           "STAFF or PATRON"
+        numeric     sus_score                  "0 to 100"
+        integer     task_completion_seconds
+        smallint    clarity_rating             "1 to 5"
+        text        comments
+        timestamptz submitted_at
+    }

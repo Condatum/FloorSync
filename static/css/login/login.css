@@ -1,0 +1,10 @@
+/* Login feature-specific presentation */
+.auth-box {
+    text-align: left;
+}
+
+.auth-box .feature-icon {
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+}

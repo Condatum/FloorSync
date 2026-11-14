@@ -1,0 +1,49 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}FloorSync — Settings{% endblock %}
+
+{% block extra_head %}
+    <link rel="stylesheet" href="{% static 'css/user_settings/user_settings.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="settings-box">
+    <img src="{% static 'images/user_settings/settings-icon.svg' %}" alt="" class="feature-icon">
+    <h1 class="page-title" id="settings-screen-heading">Account Settings</h1>
+    <p class="page-subtitle">Control how FloorSync looks and notifies you.</p>
+
+    <form method="post" action="{% url 'user_settings:settings' %}">
+        {% csrf_token %}
+
+        {% for field in form %}
+            <div class="form-group">
+                <label class="form-label checkbox-row" for="{{ field.id_for_label }}">
+                    {{ field }}
+                    {{ field.label }}
+                </label>
+                {% if field.help_text %}
+                    <div class="field-help-text">{{ field.help_text|safe }}</div>
+                {% endif %}
+                {% if field.errors %}
+                    <ul class="field-error-text">
+                        {% for error in field.errors %}
+                            <li>{{ error }}</li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+            </div>
+        {% endfor %}
+
+        <button type="submit" class="btn-primary" id="btn-save-settings">Save Settings</button>
+    </form>
+
+    <div class="nav-switch-box">
+        <a href="{% url 'home:home' %}" class="nav-link" id="link-back-home">&larr; Back to Home</a>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_body %}
+    <script src="{% static 'js/user_settings/user_settings.js' %}"></script>
+{% endblock %}
