@@ -22,5 +22,6 @@ urlpatterns = [
     path('staff/', include('apps.staff.urls')),
     path('floor/', include('apps.venue.urls')),
     path('reservations/', include('apps.reservations.urls')),
+    path('feedback/', include('apps.feedback.urls')),
     path('', include('apps.home.urls')),
 ]
