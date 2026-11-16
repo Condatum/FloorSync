@@ -1,0 +1,296 @@
+{% extends 'base.html' %}
+
+{% block title %}FloorSync — Usability Study &amp; Feedback{% endblock %}
+{% block card_class %}xl{% endblock %}
+
+{% block extra_head %}
+<style>
+    .study-header {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .study-panel {
+        background: var(--bg-secondary);
+        border: 1px solid var(--bg-card-border);
+        border-radius: 12px;
+        padding: 1.25rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .study-section-heading {
+        font-size: 1.05rem;
+        font-weight: 700;
+        color: var(--accent-cyan);
+        margin-bottom: 1rem;
+    }
+
+    .progress-header {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        align-items: baseline;
+        gap: 0.5rem;
+        margin-bottom: 0.6rem;
+    }
+
+    .study-progress-bar {
+        width: 100%;
+        height: 14px;
+        border-radius: 999px;
+        overflow: hidden;
+        accent-color: var(--accent-cyan);
+        background: var(--bg-card);
+        border: 1px solid var(--bg-card-border);
+    }
+
+    .study-progress-bar::-webkit-progress-bar {
+        background: var(--bg-card);
+        border-radius: 999px;
+    }
+
+    .study-progress-bar::-webkit-progress-value {
+        background: linear-gradient(90deg, var(--accent-purple), var(--accent-cyan));
+        border-radius: 999px;
+    }
+
+    .study-progress-bar::-moz-progress-bar {
+        background: linear-gradient(90deg, var(--accent-purple), var(--accent-cyan));
+        border-radius: 999px;
+    }
+
+    .metrics-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+        gap: 0.85rem;
+        margin-top: 1rem;
+    }
+
+    .metric-card {
+        background: var(--bg-card);
+        border: 1px solid var(--bg-card-border);
+        border-radius: 10px;
+        padding: 0.85rem 1rem;
+    }
+
+    .metric-label {
+        font-size: 0.78rem;
+        color: var(--text-secondary);
+        margin-bottom: 0.25rem;
+    }
+
+    .metric-value {
+        font-size: 1.3rem;
+        font-weight: 700;
+        color: var(--text-primary);
+    }
+
+    .study-form-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 1rem;
+    }
+
+    .field-hint {
+        font-size: 0.78rem;
+        color: var(--text-muted);
+    }
+
+    .fs-btn {
+        min-height: 44px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div>
+    <div class="study-header">
+        <div>
+            <h1 class="page-title">Usability Study &amp; Feedback</h1>
+            <p class="page-subtitle" style="margin-bottom: 0;">
+                Empirical evaluation log for FloorSync patrons and nightlife staff (target: {{ study_target }} participants).
+            </p>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+            <a href="{% url 'venue:public_map' %}" class="btn-secondary fs-btn">Live Floor Map</a>
+            <a href="{% url 'home:home' %}" class="btn-secondary fs-btn">Home</a>
+        </div>
+    </div>
+
+    <section class="study-panel" aria-labelledby="study-metrics-heading">
+        <h2 id="study-metrics-heading" class="study-section-heading">Study Progress &amp; Empirical Metrics</h2>
+
+        <div class="progress-header">
+            <label for="study-progress" class="form-label" style="margin: 0;">
+                Participant Recruitment Progress: <strong>{{ total_count }} / {{ study_target }}</strong> subjects
+            </label>
+            <span style="font-size: 0.88rem; font-weight: 700; color: var(--accent-cyan);">
+                {{ progress_percent }}%
+            </span>
+        </div>
+        <progress
+            id="study-progress"
+            class="study-progress-bar"
+            value="{{ total_count }}"
+            max="{{ study_target }}"
+        >{{ progress_percent }}%</progress>
+
+        <div class="metrics-grid">
+            <div class="metric-card">
+                <div class="metric-label">Staff Participants</div>
+                <div class="metric-value">{{ staff_count }}</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Patron Participants</div>
+                <div class="metric-value">{{ patron_count }}</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Avg. SUS Score</div>
+                <div class="metric-value">
+                    {% if avg_sus is not None %}{{ avg_sus|floatformat:1 }}{% else %}&mdash;{% endif %}
+                </div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Avg. Task Time</div>
+                <div class="metric-value">
+                    {% if avg_completion_seconds is not None %}{{ avg_completion_seconds|floatformat:1 }}s{% else %}&mdash;{% endif %}
+                </div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Avg. Clarity Rating</div>
+                <div class="metric-value">
+                    {% if avg_clarity is not None %}{{ avg_clarity|floatformat:2 }} / 5{% else %}&mdash;{% endif %}
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="study-panel" aria-labelledby="submit-response-heading">
+        <h2 id="submit-response-heading" class="study-section-heading">Submit Usability Response</h2>
+
+        <form method="post" action="{% url 'feedback:study' %}" aria-labelledby="submit-response-heading">
+            {% csrf_token %}
+            <div class="study-form-grid">
+                <div class="form-group">
+                    <label class="form-label" for="{{ form.participant_code.id_for_label }}">
+                        Participant Code <span aria-hidden="true">*</span>
+                    </label>
+                    {{ form.participant_code }}
+                    <span id="participant-code-hint" class="field-hint">Unique ID up to 10 characters (e.g. P01, S01).</span>
+                    {% if form.participant_code.errors %}
+                        <ul class="field-error-text" role="alert">{{ form.participant_code.errors }}</ul>
+                    {% endif %}
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="{{ form.participant_type.id_for_label }}">
+                        Participant Type <span aria-hidden="true">*</span>
+                    </label>
+                    {{ form.participant_type }}
+                    {% if form.participant_type.errors %}
+                        <ul class="field-error-text" role="alert">{{ form.participant_type.errors }}</ul>
+                    {% endif %}
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="{{ form.sus_score.id_for_label }}">
+                        SUS Score (0–100)
+                    </label>
+                    {{ form.sus_score }}
+                    <span id="sus-score-hint" class="field-hint">System Usability Scale score between 0 and 100.</span>
+                    {% if form.sus_score.errors %}
+                        <ul class="field-error-text" role="alert">{{ form.sus_score.errors }}</ul>
+                    {% endif %}
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="{{ form.task_completion_seconds.id_for_label }}">
+                        Task Completion Time (seconds)
+                    </label>
+                    {{ form.task_completion_seconds }}
+                    <span id="task-time-hint" class="field-hint">Seconds taken to complete the core floor-map task.</span>
+                    {% if form.task_completion_seconds.errors %}
+                        <ul class="field-error-text" role="alert">{{ form.task_completion_seconds.errors }}</ul>
+                    {% endif %}
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="{{ form.clarity_rating.id_for_label }}">
+                        Clarity Rating (1–5)
+                    </label>
+                    {{ form.clarity_rating }}
+                    <span id="clarity-hint" class="field-hint">1 = Very unclear, 5 = Crystal clear.</span>
+                    {% if form.clarity_rating.errors %}
+                        <ul class="field-error-text" role="alert">{{ form.clarity_rating.errors }}</ul>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="{{ form.comments.id_for_label }}">Comments</label>
+                {{ form.comments }}
+                {% if form.comments.errors %}
+                    <ul class="field-error-text" role="alert">{{ form.comments.errors }}</ul>
+                {% endif %}
+            </div>
+
+            <button type="submit" class="btn-primary">Submit Usability Response</button>
+        </form>
+    </section>
+
+    <section aria-labelledby="responses-heading">
+        <h2 id="responses-heading" class="study-section-heading">Recorded Usability Responses</h2>
+
+        <div tabindex="0" role="region" aria-labelledby="responses-table-caption" class="table-wrapper">
+            <table
+                class="data-table"
+                style="--label-2: 'Type'; --label-3: 'SUS Score'; --label-4: 'Task Time'; --label-5: 'Clarity'; --label-6: 'Comments';"
+            >
+                <caption id="responses-table-caption">Recent Usability Study Submissions</caption>
+                <thead>
+                    <tr>
+                        <th scope="col">Code</th>
+                        <th scope="col">Type</th>
+                        <th scope="col">SUS Score</th>
+                        <th scope="col">Task Time</th>
+                        <th scope="col">Clarity</th>
+                        <th scope="col">Comments</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in responses %}
+                    <tr>
+                        <th scope="row">
+                            <code>{{ item.participant_code }}</code>
+                            <div style="font-size: 0.75rem; font-weight: 400; color: var(--text-muted);">
+                                {{ item.submitted_at|date:"Y-m-d H:i" }}
+                            </div>
+                        </th>
+                        <td>{{ item.get_participant_type_display }}</td>
+                        <td>{% if item.sus_score is not None %}{{ item.sus_score }}{% else %}&mdash;{% endif %}</td>
+                        <td>{% if item.task_completion_seconds is not None %}{{ item.task_completion_seconds }}s{% else %}&mdash;{% endif %}</td>
+                        <td>{% if item.clarity_rating is not None %}{{ item.clarity_rating }} / 5{% else %}&mdash;{% endif %}</td>
+                        <td>{{ item.comments|default:"—" }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <th scope="row" colspan="6">No usability responses recorded yet.</th>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <div class="nav-switch-box">
+        <a href="{% url 'home:home' %}" class="nav-link">&larr; Back to Home</a>
+    </div>
+</div>
+{% endblock %}
