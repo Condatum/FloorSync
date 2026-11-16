@@ -1,0 +1,183 @@
+{% extends 'base.html' %}
+
+{% block title %}FloorSync — Admin Hub Table Status Controls{% endblock %}
+{% block card_class %}xl{% endblock %}
+
+{% block extra_head %}
+<style>
+    .hub-header {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        margin-bottom: 1.25rem;
+    }
+
+    .status-toggle-group {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.4rem;
+    }
+
+    .status-btn {
+        min-height: 44px;
+        padding: 0.45rem 0.75rem;
+        border-radius: 8px;
+        border: 1px solid var(--bg-card-border);
+        background: var(--bg-card);
+        color: var(--text-secondary);
+        font: inherit;
+        font-size: 0.8rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+
+    .status-btn:hover:not(:disabled) {
+        color: var(--text-primary);
+        border-color: var(--accent-cyan);
+    }
+
+    .status-btn:focus-visible,
+    .fs-btn:focus-visible {
+        outline: 3px solid var(--accent-cyan);
+        outline-offset: 2px;
+    }
+
+    .status-btn.is-active {
+        border-color: var(--accent-purple);
+        background: rgba(139, 92, 246, 0.22);
+        color: var(--text-primary);
+    }
+
+    .status-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    .fs-btn {
+        min-height: 44px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div>
+    <div class="hub-header">
+        <div>
+            <h1 class="page-title">Admin Hub &mdash; {{ venue.name }}</h1>
+            <p class="page-subtitle" style="margin-bottom: 0;">
+                Single-tap real-time table status toggles. Every change is recorded in the audit log.
+            </p>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+            <a href="{% url 'venue:public_map' %}" class="btn-secondary fs-btn">Live Floor Map</a>
+            {% if is_super_admin %}
+                <a href="{% url 'venue:spatial_manage' %}" class="btn-secondary fs-btn">Spatial Manager</a>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if not is_approved_staff %}
+        <div class="alert-box alert-error" role="status">
+            <div>
+                <strong>Gatekeeper Lock:</strong> Your staff account is not yet <strong>APPROVED</strong>.
+                Single-tap table status controls are disabled until a Super Admin verifies your account in
+                <a href="{% url 'staff:vetting' %}" class="nav-link">Staff Vetting</a>.
+            </div>
+        </div>
+    {% endif %}
+
+    <div tabindex="0" role="region" aria-labelledby="hub-tables-caption" class="table-wrapper" style="margin-bottom: 1.75rem;">
+        <table class="data-table" style="--label-2: 'Zone'; --label-3: 'Capacity'; --label-4: 'Min Spend'; --label-5: 'Current Status'; --label-6: 'Single-Tap Status Update';">
+            <caption id="hub-tables-caption">{{ venue.name }} ({{ floor_plan.name }}) &mdash; Live Table Controls</caption>
+            <thead>
+                <tr>
+                    <th scope="col">Table</th>
+                    <th scope="col">Zone</th>
+                    <th scope="col">Capacity</th>
+                    <th scope="col">Min Spend</th>
+                    <th scope="col">Current Status</th>
+                    <th scope="col">Single-Tap Status Update</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for table in tables %}
+                <tr>
+                    <th scope="row">
+                        {{ table.code }}
+                        {% if table.label %}
+                            <div style="font-size: 0.78rem; font-weight: 400; color: var(--text-secondary);">{{ table.label }}</div>
+                        {% endif %}
+                    </th>
+                    <td>{{ table.zone.name }}</td>
+                    <td>{{ table.capacity }} pax</td>
+                    <td>₱{{ table.min_spend|floatformat:2 }}</td>
+                    <td><strong>{{ table.get_status_display }}</strong></td>
+                    <td>
+                        <form method="post" action="{% url 'venue:admin_hub' %}" class="status-toggle-group">
+                            {% csrf_token %}
+                            <input type="hidden" name="table_id" value="{{ table.id }}">
+                            {% for status_key, status_label in status_choices %}
+                                <button
+                                    type="submit"
+                                    name="status"
+                                    value="{{ status_key }}"
+                                    class="status-btn {% if table.status == status_key %}is-active{% endif %}"
+                                    {% if not is_approved_staff %}disabled{% endif %}
+                                    aria-pressed="{% if table.status == status_key %}true{% else %}false{% endif %}"
+                                >
+                                    {{ status_label }}
+                                </button>
+                            {% endfor %}
+                        </form>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <th scope="row" colspan="6">No tables found for this floor plan.</th>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div tabindex="0" role="region" aria-labelledby="hub-logs-caption" class="table-wrapper" style="margin-bottom: 1.5rem;">
+        <table class="data-table" style="--label-2: 'Transition'; --label-3: 'Changed By'; --label-4: 'Source'; --label-5: 'Timestamp';">
+            <caption id="hub-logs-caption">Recent Table Status Audit Log</caption>
+            <thead>
+                <tr>
+                    <th scope="col">Table</th>
+                    <th scope="col">Transition</th>
+                    <th scope="col">Changed By</th>
+                    <th scope="col">Source</th>
+                    <th scope="col">Timestamp</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for log in recent_logs %}
+                <tr>
+                    <th scope="row">{{ log.table.code }}</th>
+                    <td>{{ log.previous_status }} &rarr; <strong>{{ log.new_status }}</strong></td>
+                    <td>{{ log.changed_by.username|default:"System" }}</td>
+                    <td>{{ log.get_source_display }}</td>
+                    <td>{{ log.changed_at|date:"Y-m-d H:i:s" }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <th scope="row" colspan="5">No status transitions logged yet.</th>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="nav-switch-box">
+        <a href="{% url 'home:home' %}" class="nav-link">&larr; Back to Home</a>
+    </div>
+</div>
+{% endblock %}
