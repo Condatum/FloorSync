@@ -20,7 +20,7 @@
         {% endif %}
 
         {% if form.non_field_errors %}
-            <div class="alert-box alert-error">
+            <div class="alert-box alert-error" role="alert">
                 <div>
                     {% for error in form.non_field_errors %}
                         <div>{{ error }}</div>
@@ -43,7 +43,10 @@
 
         <div class="form-group">
             <label class="form-label" for="{{ form.password.id_for_label }}">Password</label>
-            {{ form.password }}
+            <div class="password-input-wrapper">
+                {{ form.password }}
+                <button type="button" class="btn-toggle-password" aria-pressed="false" aria-controls="{{ form.password.id_for_label }}">Show</button>
+            </div>
             {% if form.password.errors %}
                 <ul class="field-error-text">
                     {% for error in form.password.errors %}

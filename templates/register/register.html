@@ -17,7 +17,7 @@
         {% csrf_token %}
 
         {% if form.non_field_errors %}
-            <div class="alert-box alert-error">
+            <div class="alert-box alert-error" role="alert">
                 <div>
                     {% for error in form.non_field_errors %}
                         <div>{{ error }}</div>
@@ -29,9 +29,16 @@
         {% for field in form %}
             <div class="form-group">
                 <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
-                {{ field }}
                 {% if field.help_text %}
-                    <div class="field-help-text">{{ field.help_text|safe }}</div>
+                    <div class="field-help-text" id="{{ field.id_for_label }}_help">{{ field.help_text|safe }}</div>
+                {% endif %}
+                {% if field.name == 'password1' or field.name == 'password2' %}
+                    <div class="password-input-wrapper">
+                        {{ field }}
+                        <button type="button" class="btn-toggle-password" aria-pressed="false" aria-controls="{{ field.id_for_label }}">Show</button>
+                    </div>
+                {% else %}
+                    {{ field }}
                 {% endif %}
                 {% if field.errors %}
                     <ul class="field-error-text">

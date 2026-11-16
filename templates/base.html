@@ -3,9 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="dark light">
     <title>{% block title %}FloorSync — Nightlife Floor Plan & Auth{% endblock %}</title>
     <style>
         :root {
+            color-scheme: dark;
             --bg-primary: #0a0e17;
             --bg-secondary: #111827;
             --bg-card: #161f30;
@@ -26,6 +28,74 @@
             --color-info-border: #3b82f6;
             --color-info-text: #93c5fd;
             --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            accent-color: var(--accent-purple);
+            scrollbar-color: #4b5563 #111827;
+        }
+
+        :root[data-theme="light"] {
+            color-scheme: light;
+            --bg-primary: #f8fafc;
+            --bg-secondary: #f1f5f9;
+            --bg-card: #ffffff;
+            --bg-card-border: #cbd5e1;
+            --accent-purple: #6d28d9;
+            --accent-purple-hover: #5b21b6;
+            --accent-cyan: #0e7490;
+            --text-primary: #0f172a;
+            --text-secondary: #334155;
+            --text-muted: #475569;
+            --color-success-bg: rgba(16, 185, 129, 0.12);
+            --color-success-border: #059669;
+            --color-success-text: #065f46;
+            --color-error-bg: rgba(239, 68, 68, 0.12);
+            --color-error-border: #dc2626;
+            --color-error-text: #991b1b;
+            --color-info-bg: rgba(59, 130, 246, 0.12);
+            --color-info-border: #2563eb;
+            --color-info-text: #1e40af;
+            scrollbar-color: #94a3b8 #e2e8f0;
+        }
+
+        @supports (color: light-dark(white, black)) {
+            :root {
+                --bg-primary: light-dark(#f8fafc, #0a0e17);
+                --bg-secondary: light-dark(#f1f5f9, #111827);
+                --bg-card: light-dark(#ffffff, #161f30);
+                --bg-card-border: light-dark(#cbd5e1, #243049);
+                --accent-purple: light-dark(#6d28d9, #8b5cf6);
+                --accent-purple-hover: light-dark(#5b21b6, #7c3aed);
+                --accent-cyan: light-dark(#0e7490, #06b6d4);
+                --text-primary: light-dark(#0f172a, #f9fafb);
+                --text-secondary: light-dark(#334155, #9ca3af);
+                --text-muted: light-dark(#475569, #6b7280);
+                scrollbar-color: light-dark(#94a3b8, #4b5563) light-dark(#e2e8f0, #111827);
+            }
+        }
+
+        .visually-hidden:where(:not(:focus-within, :active)) {
+            position: absolute !important;
+            clip-path: inset(50%) !important;
+            overflow: hidden !important;
+            width: 1px !important;
+            height: 1px !important;
+            margin: -1px !important;
+            padding: 0 !important;
+            border: 0 !important;
+            white-space: nowrap !important;
+        }
+
+        .skip-link:focus-visible {
+            position: fixed;
+            top: 0.75rem;
+            left: 0.75rem;
+            z-index: 100;
+            padding: 0.65rem 1rem;
+            background: var(--bg-card);
+            color: var(--text-primary);
+            border: 2px solid var(--accent-cyan);
+            border-radius: 8px;
+            font-weight: 600;
+            text-decoration: none;
         }
 
         * {
@@ -181,6 +251,119 @@
             max-width: 640px;
         }
 
+        .card-container.xl {
+            max-width: 1040px;
+        }
+
+        /* Responsive Data Tables */
+        .table-wrapper {
+            overflow: auto;
+            max-inline-size: 100%;
+            max-block-size: min(520px, 78vh);
+            container-type: inline-size;
+            border: 1px solid var(--bg-card-border);
+            border-radius: 12px;
+            background: var(--bg-secondary);
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            font-size: 0.875rem;
+            text-align: left;
+        }
+
+        .data-table caption {
+            padding: 0.85rem 1rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            text-align: left;
+            border-bottom: 1px solid var(--bg-card-border);
+            background: var(--bg-card);
+        }
+
+        .data-table thead {
+            position: sticky;
+            inset-block-start: 0;
+            z-index: 1;
+            background: var(--bg-card);
+        }
+
+        .data-table th,
+        .data-table td {
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid var(--bg-card-border);
+            vertical-align: middle;
+        }
+
+        .data-table thead th {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-secondary);
+            font-weight: 700;
+        }
+
+        .data-table tbody th {
+            position: sticky;
+            inset-inline-start: 0;
+            background: var(--bg-secondary);
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        @container (width < 600px) {
+            .data-table,
+            .data-table thead,
+            .data-table tbody,
+            .data-table tr,
+            .data-table th,
+            .data-table td {
+                display: block;
+            }
+
+            .data-table thead {
+                display: none;
+            }
+
+            .data-table tr {
+                margin-block-end: 1rem;
+                border: 1px solid var(--bg-card-border);
+                border-radius: 8px;
+            }
+
+            .data-table tbody th {
+                position: sticky;
+                inset-block-start: 0;
+                z-index: 2;
+                background: var(--bg-card);
+            }
+
+            .data-table td:nth-child(2)::before { content: var(--label-2, "") ": "; font-weight: 600; color: var(--text-secondary); }
+            .data-table td:nth-child(3)::before { content: var(--label-3, "") ": "; font-weight: 600; color: var(--text-secondary); }
+            .data-table td:nth-child(4)::before { content: var(--label-4, "") ": "; font-weight: 600; color: var(--text-secondary); }
+            .data-table td:nth-child(5)::before { content: var(--label-5, "") ": "; font-weight: 600; color: var(--text-secondary); }
+            .data-table td:nth-child(6)::before { content: var(--label-6, "") ": "; font-weight: 600; color: var(--text-secondary); }
+        }
+
+        /* Modal Dialog */
+        dialog.fs-dialog {
+            margin: auto;
+            width: min(92vw, 480px);
+            background: var(--bg-card);
+            color: var(--text-primary);
+            border: 1px solid var(--bg-card-border);
+            border-radius: 16px;
+            padding: 1.75rem;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.75);
+        }
+
+        dialog.fs-dialog::backdrop {
+            background-color: rgba(10, 14, 23, 0.72);
+            backdrop-filter: blur(4px);
+        }
+
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(8px); }
             to { opacity: 1; transform: translateY(0); }
@@ -264,16 +447,65 @@
             border-radius: 8px;
             padding: 0.75rem 1rem;
             color: var(--text-primary);
-            font-size: 0.95rem;
-            font-family: inherit;
-            transition: all 0.2s ease;
+            font: inherit;
+            font-size: max(1rem, 1em);
+            min-height: 48px;
+            transition: border-color 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
         }
 
-        .form-input:focus {
-            outline: none;
+        @media (pointer: coarse) {
+            .form-input {
+                min-height: 52px;
+            }
+        }
+
+        :where(a:any-link, button, input, select, textarea):focus-visible {
+            outline: 3px solid var(--accent-purple);
+            outline-offset: 2px;
+        }
+
+        .form-input:focus-visible {
             border-color: var(--accent-purple);
-            box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.25);
-            background-color: #151d2f;
+            background-color: var(--bg-secondary);
+        }
+
+        :is(input, select, textarea).form-input:is(:user-invalid, .user-invalid-fallback) {
+            border-color: var(--color-error-border);
+            background-color: var(--color-error-bg);
+        }
+
+        :is(input, select, textarea).form-input:is(:user-valid, .user-valid-fallback) {
+            border-color: var(--color-success-border);
+        }
+
+        .password-input-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .password-input-wrapper .form-input {
+            padding-inline-end: 4.5rem;
+        }
+
+        .btn-toggle-password {
+            position: absolute;
+            inset-inline-end: 0.4rem;
+            min-height: 36px;
+            padding: 0.25rem 0.6rem;
+            background: transparent;
+            color: var(--text-secondary);
+            border: 1px solid var(--bg-card-border);
+            border-radius: 6px;
+            font: inherit;
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .btn-toggle-password:hover {
+            color: var(--text-primary);
+            border-color: var(--text-muted);
         }
 
         .form-input::placeholder {
@@ -299,11 +531,78 @@
             align-items: center;
             gap: 0.6rem;
             flex-direction: row;
+            min-height: 44px;
+            cursor: pointer;
         }
 
         .checkbox-row input[type="checkbox"] {
-            width: 18px;
-            height: 18px;
+            width: 20px;
+            height: 20px;
+            flex-shrink: 0;
+        }
+
+        @supports not (accent-color: #8b5cf6) {
+            .checkbox-row input[type="checkbox"] {
+                position: absolute !important;
+                clip-path: inset(50%) !important;
+                overflow: hidden !important;
+                width: 1px !important;
+                height: 1px !important;
+                margin: -1px !important;
+                padding: 0 !important;
+                border: 0 !important;
+                white-space: nowrap !important;
+            }
+
+            .checkbox-row span {
+                position: relative;
+                padding-inline-start: 2rem;
+                display: inline-flex;
+                align-items: center;
+            }
+
+            .checkbox-row input[type="checkbox"] + span::before {
+                content: "";
+                position: absolute;
+                inset-inline-start: 0;
+                top: 50%;
+                transform: translateY(-50%);
+                width: 1.25rem;
+                height: 1.25rem;
+                border: 2px solid var(--bg-card-border);
+                background: var(--bg-secondary);
+                border-radius: 4px;
+                box-sizing: border-box;
+            }
+
+            .checkbox-row input[type="checkbox"]:focus-visible + span::before {
+                outline: 3px solid var(--accent-purple);
+                outline-offset: 2px;
+            }
+
+            .checkbox-row input[type="checkbox"]:checked + span::before {
+                background-color: var(--accent-purple);
+                border-color: var(--accent-purple);
+            }
+
+            .checkbox-row input[type="checkbox"]:checked + span::after {
+                content: "✓";
+                position: absolute;
+                inset-inline-start: 0.25rem;
+                top: 50%;
+                transform: translateY(-50%);
+                color: #ffffff;
+                font-weight: bold;
+                font-size: 0.9rem;
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
         }
 
         /* Buttons */
@@ -411,19 +710,20 @@
     {% block extra_head %}{% endblock %}
 </head>
 <body>
+    <a href="#main-content" class="skip-link visually-hidden">Skip to main content</a>
     <header class="site-header">
         <div class="header-container">
             <a href="{% url 'root' %}" class="brand-logo">
-                <div class="logo-icon">FS</div>
+                <div class="logo-icon" aria-hidden="true">FS</div>
                 <div class="brand-text">Floor<span>Sync</span></div>
                 <span class="badge-scaffold">Vertical Slice</span>
             </a>
             <div class="header-nav">
                 {% if user.is_authenticated %}
-                    <nav class="feature-nav">
-                        <a href="{% url 'home:home' %}" class="feature-nav-link {% if request.resolver_match.namespace == 'home' %}active{% endif %}">Home</a>
-                        <a href="{% url 'profile:profile' %}" class="feature-nav-link {% if request.resolver_match.namespace == 'profile' %}active{% endif %}">Profile</a>
-                        <a href="{% url 'user_settings:settings' %}" class="feature-nav-link {% if request.resolver_match.namespace == 'user_settings' %}active{% endif %}">Settings</a>
+                    <nav class="feature-nav" aria-label="Primary">
+                        <a href="{% url 'home:home' %}" class="feature-nav-link {% if request.resolver_match.namespace == 'home' %}active{% endif %}"{% if request.resolver_match.namespace == 'home' %} aria-current="page"{% endif %}>Home</a>
+                        <a href="{% url 'profile:profile' %}" class="feature-nav-link {% if request.resolver_match.namespace == 'profile' %}active{% endif %}"{% if request.resolver_match.namespace == 'profile' %} aria-current="page"{% endif %}>Profile</a>
+                        <a href="{% url 'user_settings:settings' %}" class="feature-nav-link {% if request.resolver_match.namespace == 'user_settings' %}active{% endif %}"{% if request.resolver_match.namespace == 'user_settings' %} aria-current="page"{% endif %}>Settings</a>
                     </nav>
                     <span class="user-status">Staff: <strong>{{ user.username }}</strong></span>
                     <a href="{% url 'logout' %}" class="btn-secondary">Log Out</a>
@@ -434,12 +734,12 @@
         </div>
     </header>
 
-    <main class="main-wrapper">
+    <main id="main-content" class="main-wrapper" tabindex="-1">
         <div class="card-container {% block card_class %}{% endblock %}">
             {% if messages %}
-                <div class="messages-container">
+                <div class="messages-container" aria-live="polite">
                     {% for message in messages %}
-                        <div class="alert-box alert-{{ message.tags|default:'info' }}">
+                        <div class="alert-box alert-{{ message.tags|default:'info' }}" role="status">
                             <div>{{ message }}</div>
                         </div>
                     {% endfor %}

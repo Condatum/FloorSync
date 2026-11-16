@@ -11,6 +11,8 @@ class StaffRegistrationForm(UserCreationForm):
             'class': 'form-input',
             'placeholder': 'staff@floorsync.club',
             'autocomplete': 'email',
+            'spellcheck': 'false',
+            'enterkeyhint': 'next',
         })
     )
 
@@ -20,6 +22,21 @@ class StaffRegistrationForm(UserCreationForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields['username'].widget.attrs.update({
+            'autocomplete': 'username',
+            'autocorrect': 'off',
+            'autocapitalize': 'none',
+            'spellcheck': 'false',
+            'enterkeyhint': 'next',
+        })
+        self.fields['password1'].widget.attrs.update({
+            'autocomplete': 'new-password',
+            'enterkeyhint': 'next',
+        })
+        self.fields['password2'].widget.attrs.update({
+            'autocomplete': 'new-password',
+            'enterkeyhint': 'done',
+        })
         for field_name, field in self.fields.items():
             current_classes = field.widget.attrs.get('class', '')
             if 'form-input' not in current_classes:

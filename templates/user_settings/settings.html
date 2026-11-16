@@ -20,7 +20,7 @@
             <div class="form-group">
                 <label class="form-label checkbox-row" for="{{ field.id_for_label }}">
                     {{ field }}
-                    {{ field.label }}
+                    <span>{{ field.label }}</span>
                 </label>
                 {% if field.help_text %}
                     <div class="field-help-text">{{ field.help_text|safe }}</div>

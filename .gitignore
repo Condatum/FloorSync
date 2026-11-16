@@ -43,3 +43,17 @@ wheels/
 *.swo
 *~
 .DS_Store
+
+# Agent, local archives & monitoring artifacts
+.agents/
+.claude/
+floorsync_project/.claude/
+skills-lock.json
+*.mp4
+*.zip
+*.pdf
+BASELINE_COMMIT.txt
+GIT_*.txt
+GIT_*.patch
+APPLICATION_SCREENSHOTS/
+GITHUB_SCREENSHOTS/

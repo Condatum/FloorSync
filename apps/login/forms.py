@@ -8,9 +8,16 @@ class StaffLoginForm(AuthenticationForm):
         self.fields['username'].widget.attrs.update({
             'class': 'form-input',
             'placeholder': 'Enter staff username',
+            'autocomplete': 'username',
+            'autocorrect': 'off',
+            'autocapitalize': 'none',
+            'spellcheck': 'false',
+            'enterkeyhint': 'next',
             'autofocus': True,
         })
         self.fields['password'].widget.attrs.update({
             'class': 'form-input',
             'placeholder': 'Enter password',
+            'autocomplete': 'current-password',
+            'enterkeyhint': 'done',
         })
