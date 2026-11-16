@@ -1,0 +1,94 @@
+{% extends 'base.html' %}
+
+{% block title %}FloorSync — Gatekeeper Staff Vetting{% endblock %}
+{% block card_class %}xl{% endblock %}
+
+{% block content %}
+<div>
+    <h1 class="page-title" id="vetting-heading">Gatekeeper Staff Vetting</h1>
+    <p class="page-subtitle">
+        Two-tier hierarchical access control: new staff registrations default to <strong>PENDING</strong> until verified by a Super Admin.
+    </p>
+
+    <div class="alert-box {% if is_approved_staff %}alert-success{% else %}alert-info{% endif %}" role="status">
+        <div>
+            <strong>Your Account:</strong> {{ request.user.username }} &bull;
+            Role: <strong>{{ my_account.get_role_display }}</strong> &bull;
+            Verification: <strong>{{ my_account.get_verification_status_display }}</strong>
+            {% if not is_approved_staff %}
+                — Operational controls (Admin Hub toggles, duty shifts, reservations) are locked until a Super Admin approves your account.
+            {% endif %}
+        </div>
+    </div>
+
+    <div tabindex="0" role="region" aria-labelledby="staff-vetting-caption" class="table-wrapper" style="margin-bottom: 1.5rem;">
+        <table class="data-table" style="--label-2: 'Email'; --label-3: 'Role'; --label-4: 'Verification'; --label-5: 'Verified By'; --label-6: 'Actions';">
+            <caption id="staff-vetting-caption">Registered Venue Staff Directory</caption>
+            <thead>
+                <tr>
+                    <th scope="col">Username</th>
+                    <th scope="col">Email</th>
+                    <th scope="col">Role</th>
+                    <th scope="col">Verification</th>
+                    <th scope="col">Verified By</th>
+                    <th scope="col">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for acct in accounts %}
+                <tr>
+                    <th scope="row">{{ acct.user.username }}</th>
+                    <td>{{ acct.user.email|default:"—" }}</td>
+                    <td>{{ acct.get_role_display }}</td>
+                    <td>
+                        {% if acct.verification_status == 'APPROVED' %}
+                            <span style="color: var(--color-success-text); font-weight: 700;">APPROVED</span>
+                        {% elif acct.verification_status == 'REJECTED' %}
+                            <span style="color: var(--color-error-text); font-weight: 700;">REJECTED</span>
+                            {% if acct.rejection_reason %}<div class="field-help-text">{{ acct.rejection_reason }}</div>{% endif %}
+                        {% else %}
+                            <span style="color: var(--color-info-text); font-weight: 700;">PENDING</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ acct.verified_by.username|default:"—" }}</td>
+                    <td>
+                        {% if is_super_admin %}
+                            <form method="post" action="{% url 'staff:vetting' %}" style="display: flex; flex-wrap: wrap; gap: 0.4rem;">
+                                {% csrf_token %}
+                                <input type="hidden" name="account_id" value="{{ acct.id }}">
+                                {% if acct.verification_status != 'APPROVED' %}
+                                    <button type="submit" name="action" value="approve" class="btn-secondary" style="border-color: var(--color-success-border); color: var(--color-success-text);">
+                                        Approve
+                                    </button>
+                                {% endif %}
+                                {% if acct.role != 'SUPER_ADMIN' %}
+                                    <button type="submit" name="action" value="make_super_admin" class="btn-secondary">
+                                        Make Super Admin
+                                    </button>
+                                {% endif %}
+                                {% if acct.verification_status != 'REJECTED' and acct.user != request.user %}
+                                    <button type="submit" name="action" value="reject" class="btn-secondary" style="border-color: var(--color-error-border); color: var(--color-error-text);">
+                                        Reject
+                                    </button>
+                                {% endif %}
+                            </form>
+                        {% else %}
+                            <span style="color: var(--text-muted);">Super Admin only</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <th scope="row" colspan="6">No staff accounts found.</th>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="nav-switch-box">
+        <a href="{% url 'staff:duty' %}" class="nav-button-link">Manage Duty Shifts &amp; Concierge Channels &rarr;</a>
+        <a href="{% url 'home:home' %}" class="nav-link">&larr; Back to Home</a>
+    </div>
+</div>
+{% endblock %}

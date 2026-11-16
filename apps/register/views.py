@@ -1,6 +1,8 @@
 from django.contrib import messages
 from django.shortcuts import redirect, render
 
+from apps.staff.models import StaffAccount
+
 from .forms import StaffRegistrationForm
 
 
@@ -13,6 +15,13 @@ def register_view(request):
         form = StaffRegistrationForm(request.POST)
         if form.is_valid():
             user = form.save()
+            StaffAccount.objects.get_or_create(
+                user=user,
+                defaults={
+                    'role': 'STAFF',
+                    'verification_status': 'PENDING',
+                },
+            )
             messages.success(
                 request,
                 f"Account for '{user.username}' created successfully! Please log in with your credentials."

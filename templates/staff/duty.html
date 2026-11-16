@@ -1,0 +1,122 @@
+{% extends 'base.html' %}
+
+{% block title %}FloorSync — Duty Shifts & One-Tap Concierge{% endblock %}
+{% block card_class %}xl{% endblock %}
+
+{% block content %}
+<div>
+    <h1 class="page-title" id="duty-heading">Duty-Based Concierge Routing</h1>
+    <p class="page-subtitle">
+        Configure your contact handles and active duty shift so the guest <strong>One-Tap Connect</strong> button routes directly to the admin on the floor.
+    </p>
+
+    <div class="alert-box alert-info" role="status">
+        <div>
+            <strong>Current Active Concierge:</strong>
+            {% if active_shift %}
+                <strong>{{ active_shift.staff.username }}</strong> on duty at <strong>{{ active_shift.venue.name }}</strong>
+                {% if active_channel %}via {{ active_channel.get_channel_type_display }} ({{ active_channel.handle_or_url }}){% endif %}
+                &mdash; <a href="{{ sample_deeplink }}" class="nav-link" target="_blank" rel="noopener">Test One-Tap Connect Link &nearr;</a>
+            {% else %}
+                No active shift &mdash; falling back to Venue Hotline (<a href="{{ sample_deeplink }}" class="nav-link">{{ sample_deeplink }}</a>).
+            {% endif %}
+        </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
+        <section style="background: var(--bg-secondary); border: 1px solid var(--bg-card-border); border-radius: 12px; padding: 1.25rem;">
+            <h2 style="font-size: 1.05rem; margin-bottom: 0.75rem; color: var(--accent-cyan);">1. Add / Update Contact Channel</h2>
+            <form method="post" action="{% url 'staff:duty' %}">
+                {% csrf_token %}
+                <input type="hidden" name="form_type" value="add_channel">
+                <div class="form-group">
+                    <label class="form-label" for="{{ channel_form.channel_type.id_for_label }}">Channel Type</label>
+                    {{ channel_form.channel_type }}
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="{{ channel_form.handle_or_url.id_for_label }}">Handle / Phone / URL</label>
+                    {{ channel_form.handle_or_url }}
+                </div>
+                <div class="form-group">
+                    <label class="form-label checkbox-row" for="{{ channel_form.is_primary.id_for_label }}">
+                        {{ channel_form.is_primary }}
+                        <span>Primary Channel</span>
+                    </label>
+                </div>
+                <div class="form-group">
+                    <label class="form-label checkbox-row" for="{{ channel_form.is_active.id_for_label }}">
+                        {{ channel_form.is_active }}
+                        <span>Channel Active</span>
+                    </label>
+                </div>
+                <button type="submit" class="btn-primary">Save Contact Channel</button>
+            </form>
+        </section>
+
+        <section style="background: var(--bg-secondary); border: 1px solid var(--bg-card-border); border-radius: 12px; padding: 1.25rem;">
+            <h2 style="font-size: 1.05rem; margin-bottom: 0.75rem; color: var(--accent-cyan);">2. Start Floor Duty Shift</h2>
+            <form method="post" action="{% url 'staff:duty' %}">
+                {% csrf_token %}
+                <input type="hidden" name="form_type" value="start_shift">
+                <div class="form-group">
+                    <label class="form-label" for="{{ shift_form.venue.id_for_label }}">Venue</label>
+                    {{ shift_form.venue }}
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="{{ shift_form.contact_channel.id_for_label }}">Active Concierge Channel</label>
+                    {{ shift_form.contact_channel }}
+                </div>
+                <button type="submit" class="btn-primary">Go On Duty Now</button>
+            </form>
+        </section>
+    </div>
+
+    <div tabindex="0" role="region" aria-labelledby="active-shifts-caption" class="table-wrapper" style="margin-bottom: 1.5rem;">
+        <table class="data-table" style="--label-2: 'Staff'; --label-3: 'Channel'; --label-4: 'Started'; --label-5: 'Action';">
+            <caption id="active-shifts-caption">Active Venue Duty Shifts</caption>
+            <thead>
+                <tr>
+                    <th scope="col">Venue</th>
+                    <th scope="col">On-Duty Staff</th>
+                    <th scope="col">Routing Channel</th>
+                    <th scope="col">Started At</th>
+                    <th scope="col">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for shift in active_shifts %}
+                <tr>
+                    <th scope="row">{{ shift.venue.name }}</th>
+                    <td>{{ shift.staff.username }}</td>
+                    <td>
+                        {% if shift.contact_channel %}
+                            {{ shift.contact_channel.get_channel_type_display }}: {{ shift.contact_channel.handle_or_url }}
+                        {% else %}
+                            Default Primary / Hotline
+                        {% endif %}
+                    </td>
+                    <td>{{ shift.started_at|date:"Y-m-d H:i" }}</td>
+                    <td>
+                        <form method="post" action="{% url 'staff:duty' %}">
+                            {% csrf_token %}
+                            <input type="hidden" name="form_type" value="end_shift">
+                            <input type="hidden" name="shift_id" value="{{ shift.id }}">
+                            <button type="submit" class="btn-secondary">End Shift</button>
+                        </form>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <th scope="row" colspan="5">No active duty shifts right now.</th>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="nav-switch-box">
+        <a href="{% url 'staff:vetting' %}" class="nav-button-link">&larr; Staff Vetting Directory</a>
+        <a href="{% url 'home:home' %}" class="nav-link">&larr; Back to Home</a>
+    </div>
+</div>
+{% endblock %}
