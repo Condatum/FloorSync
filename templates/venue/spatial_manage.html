@@ -1,0 +1,230 @@
+{% extends 'base.html' %}
+
+{% block title %}FloorSync — Spatial Floor Manager{% endblock %}
+{% block card_class %}xl{% endblock %}
+
+{% block extra_head %}
+<style>
+    .spatial-header {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        margin-bottom: 1.25rem;
+    }
+
+    .spatial-form-card {
+        background: var(--bg-secondary);
+        border: 1px solid var(--bg-card-border);
+        border-radius: 12px;
+        padding: 1.25rem;
+        margin-bottom: 1.75rem;
+    }
+
+    .spatial-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+        gap: 1rem;
+    }
+
+    .perks-checkbox-list ul {
+        list-style: none;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem 1.25rem;
+        padding: 0.5rem 0;
+    }
+
+    .perks-checkbox-list label {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+        font-size: 0.875rem;
+        color: var(--text-primary);
+        cursor: pointer;
+        min-height: 44px;
+    }
+
+    .fs-btn {
+        min-height: 44px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .fs-btn:focus-visible {
+        outline: 3px solid var(--accent-cyan);
+        outline-offset: 2px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div>
+    <div class="spatial-header">
+        <div>
+            <h1 class="page-title">Spatial Floor Manager &mdash; {{ venue.name }}</h1>
+            <p class="page-subtitle" style="margin-bottom: 0;">
+                Super Admin layout configuration for {{ floor_plan.name }} ({{ floor_plan.canvas_width }}&times;{{ floor_plan.canvas_height }}).
+            </p>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+            <a href="{% url 'venue:public_map' %}" class="btn-secondary fs-btn">Live Floor Map</a>
+            <a href="{% url 'venue:admin_hub' %}" class="btn-secondary fs-btn">Admin Hub</a>
+        </div>
+    </div>
+
+    {% if not is_super_admin %}
+        <div class="alert-box alert-error" role="status">
+            <div>
+                <strong>Super Admin Only:</strong> Creating or modifying spatial table coordinates and attributes is restricted to approved Super Admins.
+            </div>
+        </div>
+    {% else %}
+        <section class="spatial-form-card" aria-labelledby="spatial-form-heading">
+            <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 1rem;">
+                <h2 id="spatial-form-heading" style="font-size: 1.05rem; color: var(--accent-cyan);">
+                    {% if editing_table %}
+                        Edit Table {{ editing_table.code }}
+                    {% else %}
+                        Add New Table
+                    {% endif %}
+                </h2>
+                {% if editing_table %}
+                    <a href="{% url 'venue:spatial_manage' %}" class="btn-secondary fs-btn">Cancel Edit</a>
+                {% endif %}
+            </div>
+
+            <form method="post" action="{% url 'venue:spatial_manage' %}">
+                {% csrf_token %}
+                {% if editing_table %}
+                    <input type="hidden" name="table_id" value="{{ editing_table.id }}">
+                {% endif %}
+
+                {% if form.non_field_errors %}
+                    <div class="alert-box alert-error" role="alert">{{ form.non_field_errors }}</div>
+                {% endif %}
+
+                <div class="spatial-grid">
+                    <div class="form-group">
+                        <label class="form-label" for="{{ form.zone.id_for_label }}">Zone</label>
+                        {{ form.zone }}
+                        {{ form.zone.errors }}
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="{{ form.code.id_for_label }}">Table Code</label>
+                        {{ form.code }}
+                        {{ form.code.errors }}
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="{{ form.label.id_for_label }}">Label</label>
+                        {{ form.label }}
+                        {{ form.label.errors }}
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="{{ form.shape.id_for_label }}">Shape</label>
+                        {{ form.shape }}
+                        {{ form.shape.errors }}
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="{{ form.capacity.id_for_label }}">Capacity (pax)</label>
+                        {{ form.capacity }}
+                        {{ form.capacity.errors }}
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="{{ form.min_spend.id_for_label }}">Min Spend (₱)</label>
+                        {{ form.min_spend }}
+                        {{ form.min_spend.errors }}
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="{{ form.pos_x.id_for_label }}">Pos X (0&ndash;1200)</label>
+                        {{ form.pos_x }}
+                        {{ form.pos_x.errors }}
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="{{ form.pos_y.id_for_label }}">Pos Y (0&ndash;800)</label>
+                        {{ form.pos_y }}
+                        {{ form.pos_y.errors }}
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="{{ form.width.id_for_label }}">Width</label>
+                        {{ form.width }}
+                        {{ form.width.errors }}
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="{{ form.height.id_for_label }}">Height</label>
+                        {{ form.height }}
+                        {{ form.height.errors }}
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="{{ form.status.id_for_label }}">Status</label>
+                        {{ form.status }}
+                        {{ form.status.errors }}
+                    </div>
+                    <div class="form-group" style="justify-content: flex-end;">
+                        <label class="form-label checkbox-row" for="{{ form.is_visible.id_for_label }}">
+                            {{ form.is_visible }}
+                            <span>Visible on Public Map</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="form-group perks-checkbox-list">
+                    <span class="form-label">Perks</span>
+                    {{ form.perks }}
+                    {{ form.perks.errors }}
+                </div>
+
+                <button type="submit" class="btn-primary fs-btn" style="width: auto; padding-inline: 1.5rem;">
+                    {% if editing_table %}Save Table Changes{% else %}Create Table{% endif %}
+                </button>
+            </form>
+        </section>
+    {% endif %}
+
+    <div tabindex="0" role="region" aria-labelledby="spatial-tables-caption" class="table-wrapper" style="margin-bottom: 1.5rem;">
+        <table class="data-table" style="--label-2: 'Zone'; --label-3: 'Coordinates'; --label-4: 'Shape & Size'; --label-5: 'Capacity & Min Spend'; --label-6: 'Visible'; --label-7: 'Actions';">
+            <caption id="spatial-tables-caption">Configured Floor Tables ({{ tables|length }})</caption>
+            <thead>
+                <tr>
+                    <th scope="col">Table</th>
+                    <th scope="col">Zone</th>
+                    <th scope="col">Coordinates</th>
+                    <th scope="col">Shape &amp; Size</th>
+                    <th scope="col">Capacity &amp; Min Spend</th>
+                    <th scope="col">Visible</th>
+                    <th scope="col">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for table in tables %}
+                <tr>
+                    <th scope="row">{{ table.code }}</th>
+                    <td>{{ table.zone.name }}</td>
+                    <td>({{ table.pos_x|floatformat:0 }}, {{ table.pos_y|floatformat:0 }})</td>
+                    <td>{{ table.get_shape_display }} ({{ table.width|floatformat:0 }}&times;{{ table.height|floatformat:0 }})</td>
+                    <td>{{ table.capacity }} pax &bull; ₱{{ table.min_spend|floatformat:2 }}</td>
+                    <td>{% if table.is_visible %}Yes{% else %}Hidden{% endif %}</td>
+                    <td>
+                        {% if is_super_admin %}
+                            <a href="{% url 'venue:spatial_manage' %}?edit={{ table.id }}" class="btn-secondary fs-btn">Edit</a>
+                        {% else %}
+                            <span style="color: var(--text-muted);">Super Admin only</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <th scope="row" colspan="7">No tables configured yet.</th>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="nav-switch-box">
+        <a href="{% url 'home:home' %}" class="nav-link">&larr; Back to Home</a>
+    </div>
+</div>
+{% endblock %}

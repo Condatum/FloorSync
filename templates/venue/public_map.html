@@ -1,0 +1,335 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}FloorSync — {{ venue.name }} Live Floor Map{% endblock %}
+{% block card_class %}xl{% endblock %}
+
+{% block extra_head %}
+<style>
+    .floor-header-bar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        margin-bottom: 1.25rem;
+    }
+
+    .legend-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem 1.25rem;
+        align-items: center;
+        margin-bottom: 1rem;
+        padding: 0.75rem 1rem;
+        background: var(--bg-secondary);
+        border: 1px solid var(--bg-card-border);
+        border-radius: 10px;
+        font-size: 0.85rem;
+    }
+
+    .legend-item {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+        color: var(--text-secondary);
+        font-weight: 500;
+    }
+
+    .legend-dot {
+        width: 12px;
+        height: 12px;
+        border-radius: 9999px;
+        display: inline-block;
+        flex-shrink: 0;
+    }
+
+    .floor-map-viewport {
+        overflow-x: auto;
+        border: 1px solid var(--bg-card-border);
+        border-radius: 14px;
+        background: var(--bg-secondary);
+        padding: 0.75rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .floor-canvas {
+        position: relative;
+        width: 100%;
+        min-width: 680px;
+        aspect-ratio: {{ floor_plan.canvas_width }} / {{ floor_plan.canvas_height }};
+        background:
+            linear-gradient(to right, rgba(148, 163, 184, 0.06) 1px, transparent 1px),
+            linear-gradient(to bottom, rgba(148, 163, 184, 0.06) 1px, transparent 1px),
+            radial-gradient(circle at 50% 45%, rgba(139, 92, 246, 0.12) 0%, transparent 55%),
+            var(--bg-primary);
+        background-size: 40px 40px, 40px 40px, 100% 100%, 100% 100%;
+        border: 1px solid var(--bg-card-border);
+        border-radius: 10px;
+        overflow: hidden;
+    }
+
+    .floor-landmark {
+        position: absolute;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        pointer-events: none;
+        border-radius: 12px;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+    }
+
+    .landmark-dj {
+        left: 35%;
+        top: 3%;
+        width: 30%;
+        height: 10%;
+        background: linear-gradient(135deg, rgba(139, 92, 246, 0.25), rgba(6, 182, 212, 0.2));
+        border: 1px solid rgba(139, 92, 246, 0.6);
+        color: var(--text-primary);
+        font-size: 0.85rem;
+    }
+
+    .landmark-dance {
+        left: 31%;
+        top: 31%;
+        width: 38%;
+        height: 34%;
+        background: radial-gradient(circle, rgba(6, 182, 212, 0.14), rgba(139, 92, 246, 0.08));
+        border: 1px dashed rgba(6, 182, 212, 0.45);
+        color: var(--text-secondary);
+        font-size: 0.9rem;
+    }
+
+    .table-node {
+        position: absolute;
+        min-width: 44px;
+        min-height: 44px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 0.25rem;
+        border: 2px solid transparent;
+        border-radius: 8px;
+        cursor: pointer;
+        font: inherit;
+        color: #f9fafb;
+        text-align: center;
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+    }
+
+    .table-node:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 18px rgba(0, 0, 0, 0.45);
+    }
+
+    .table-node:focus-visible,
+    .fs-btn:focus-visible {
+        outline: 3px solid var(--accent-cyan);
+        outline-offset: 2px;
+    }
+
+    .table-node.shape-CIRCLE {
+        border-radius: 9999px;
+    }
+
+    .table-node.shape-BOOTH {
+        border-radius: 16px;
+    }
+
+    .table-node.status-AVAILABLE {
+        background: rgba(16, 185, 129, 0.26);
+        border-color: #10b981;
+    }
+
+    .table-node.status-RESERVED {
+        background: rgba(245, 158, 11, 0.26);
+        border-color: #f59e0b;
+    }
+
+    .table-node.status-OCCUPIED {
+        background: rgba(239, 68, 68, 0.26);
+        border-color: #ef4444;
+    }
+
+    .table-node.status-BLOCKED {
+        background: rgba(100, 116, 139, 0.3);
+        border-color: #64748b;
+        opacity: 0.78;
+    }
+
+    .table-code {
+        font-weight: 700;
+        font-size: 0.8rem;
+        line-height: 1.15;
+    }
+
+    .table-meta-mini {
+        font-size: 0.68rem;
+        color: #e2e8f0;
+        opacity: 0.9;
+    }
+
+    .fs-btn {
+        min-height: 44px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.4rem;
+    }
+
+    .dialog-meta-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.75rem;
+        margin: 1rem 0 1.25rem;
+        padding: 0.9rem;
+        background: var(--bg-secondary);
+        border: 1px solid var(--bg-card-border);
+        border-radius: 10px;
+    }
+
+    .dialog-meta-label {
+        display: block;
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--text-secondary);
+    }
+
+    .dialog-meta-value {
+        font-weight: 700;
+        font-size: 0.95rem;
+        color: var(--text-primary);
+    }
+
+    .dialog-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        align-items: center;
+        justify-content: flex-end;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div>
+    <div class="floor-header-bar">
+        <div>
+            <h1 class="page-title">{{ venue.name }} &mdash; {{ floor_plan.name }}</h1>
+            <p class="page-subtitle" style="margin-bottom: 0;">
+                Live 2D floor availability ({{ floor_plan.canvas_width }}&times;{{ floor_plan.canvas_height }}). Select any table to view perks and connect with the on-duty concierge.
+            </p>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+            {% if is_approved_staff %}
+                <a href="{% url 'venue:admin_hub' %}" class="btn-secondary fs-btn">Admin Hub</a>
+            {% endif %}
+            {% if is_super_admin %}
+                <a href="{% url 'venue:spatial_manage' %}" class="btn-secondary fs-btn">Spatial Manager</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="alert-box alert-info" role="status">
+        <div>
+            <strong>Concierge Desk:</strong>
+            {% if active_shift %}
+                <strong>{{ active_shift.staff.username }}</strong> is currently on floor duty
+                {% if active_channel %}via {{ active_channel.get_channel_type_display }}{% endif %}.
+            {% else %}
+                No active shift &mdash; inquiries route directly to the venue hotline ({{ venue.hotline }}).
+            {% endif %}
+            <a href="{{ general_deeplink }}" class="nav-link" target="_blank" rel="noopener">General Inquiry &nearr;</a>
+        </div>
+    </div>
+
+    <div class="legend-row" aria-label="Floor status and zone legend">
+        <span class="legend-item"><span class="legend-dot" style="background: #10b981;"></span> Available</span>
+        <span class="legend-item"><span class="legend-dot" style="background: #f59e0b;"></span> Reserved</span>
+        <span class="legend-item"><span class="legend-dot" style="background: #ef4444;"></span> Occupied</span>
+        <span class="legend-item"><span class="legend-dot" style="background: #64748b;"></span> Blocked</span>
+        {% for zone in zones %}
+            <span class="legend-item"><span class="legend-dot" style="background: {{ zone.display_color }};"></span> {{ zone.name }}</span>
+        {% endfor %}
+    </div>
+
+    <div class="floor-map-viewport" tabindex="0" role="region" aria-label="{{ venue.name }} interactive 2D floor map">
+        <div class="floor-canvas">
+            <div class="floor-landmark landmark-dj" aria-hidden="true">DJ Booth</div>
+            <div class="floor-landmark landmark-dance" aria-hidden="true">Dance Floor</div>
+
+            {% for item in table_items %}
+                {% with table=item.obj %}
+                <button
+                    type="button"
+                    class="table-node shape-{{ table.shape }} status-{{ table.status }}"
+                    style="left: calc({{ table.pos_x }} / {{ floor_plan.canvas_width }} * 100%); top: calc({{ table.pos_y }} / {{ floor_plan.canvas_height }} * 100%); width: calc({{ table.width }} / {{ floor_plan.canvas_width }} * 100%); height: calc({{ table.height }} / {{ floor_plan.canvas_height }} * 100%);"
+                    data-table-trigger
+                    data-code="{{ table.code }}"
+                    data-label="{{ table.label|default:table.code }}"
+                    data-zone="{{ table.zone.name }}"
+                    data-capacity="{{ table.capacity }} pax"
+                    data-min-spend="₱{{ table.min_spend|floatformat:2 }}"
+                    data-status="{{ table.get_status_display }}"
+                    data-perks="{{ item.perks_text }}"
+                    data-deeplink="{{ item.deeplink }}"
+                    aria-label="Table {{ table.code }}, {{ table.zone.name }}, {{ table.capacity }} guests, {{ table.get_status_display }}"
+                >
+                    <span class="table-code">{{ table.code }}</span>
+                    <span class="table-meta-mini">{{ table.capacity }}p &bull; {{ table.get_status_display }}</span>
+                </button>
+                {% endwith %}
+            {% endfor %}
+        </div>
+    </div>
+
+    <dialog id="table-detail-dialog" class="fs-dialog" closedby="any" aria-labelledby="dialog-table-title">
+        <h2 id="dialog-table-title" style="font-size: 1.25rem; font-weight: 700; margin-bottom: 0.25rem;">Table Details</h2>
+        <p id="dialog-table-subtitle" style="font-size: 0.875rem; color: var(--text-secondary);"></p>
+
+        <div class="dialog-meta-grid">
+            <div>
+                <span class="dialog-meta-label">Zone</span>
+                <span id="dialog-table-zone" class="dialog-meta-value">—</span>
+            </div>
+            <div>
+                <span class="dialog-meta-label">Status</span>
+                <span id="dialog-table-status" class="dialog-meta-value">—</span>
+            </div>
+            <div>
+                <span class="dialog-meta-label">Capacity</span>
+                <span id="dialog-table-capacity" class="dialog-meta-value">—</span>
+            </div>
+            <div>
+                <span class="dialog-meta-label">Minimum Spend</span>
+                <span id="dialog-table-min-spend" class="dialog-meta-value">—</span>
+            </div>
+            <div style="grid-column: 1 / -1;">
+                <span class="dialog-meta-label">Table Perks</span>
+                <span id="dialog-table-perks" class="dialog-meta-value">—</span>
+            </div>
+        </div>
+
+        <div class="dialog-actions">
+            <a id="dialog-connect-link" href="#" class="btn-primary fs-btn" target="_blank" rel="noopener" style="width: auto; margin-top: 0;">
+                One-Tap Connect &nearr;
+            </a>
+            <form method="dialog">
+                <button type="submit" class="btn-secondary fs-btn">Close</button>
+            </form>
+        </div>
+    </dialog>
+</div>
+{% endblock %}
+
+{% block extra_body %}
+<script src="{% static 'js/venue/public_map.js' %}"></script>
+{% endblock %}
