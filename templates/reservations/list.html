@@ -1,0 +1,252 @@
+{% extends 'base.html' %}
+
+{% block title %}FloorSync — Reservations & Deposit Log{% endblock %}
+{% block card_class %}xl{% endblock %}
+
+{% block extra_head %}
+<style>
+    .res-header {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .res-panel {
+        background: var(--bg-secondary);
+        border: 1px solid var(--bg-card-border);
+        border-radius: 12px;
+        padding: 1.25rem;
+        margin-bottom: 1.75rem;
+    }
+
+    .res-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 1rem;
+    }
+
+    .fs-btn {
+        min-height: 44px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .inline-update-form {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .inline-update-form select.form-input {
+        min-height: 44px;
+        padding: 0.45rem 0.65rem;
+        font-size: 0.85rem;
+        width: auto;
+        min-width: 130px;
+    }
+
+    .badge-verified {
+        display: inline-block;
+        padding: 0.15rem 0.5rem;
+        border-radius: 999px;
+        font-size: 0.72rem;
+        font-weight: 700;
+        background: var(--color-success-bg);
+        border: 1px solid var(--color-success-border);
+        color: var(--color-success-text);
+    }
+
+    .badge-unverified {
+        display: inline-block;
+        padding: 0.15rem 0.5rem;
+        border-radius: 999px;
+        font-size: 0.72rem;
+        font-weight: 700;
+        background: var(--color-info-bg);
+        border: 1px solid var(--color-info-border);
+        color: var(--color-info-text);
+    }
+
+    @container (width < 600px) {
+        .data-table td:nth-child(7)::before {
+            content: var(--label-7, "") ": ";
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div>
+    <div class="res-header">
+        <div>
+            <h1 class="page-title">Reservations &amp; Deposits</h1>
+            <p class="page-subtitle" style="margin-bottom: 0;">
+                Log staff-authored VIP bookings, verify deposits, and sync live table availability.
+            </p>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+            <a href="{% url 'reservations:audit' %}" class="btn-secondary fs-btn">Audit Ledger</a>
+            <a href="{% url 'venue:admin_hub' %}" class="btn-secondary fs-btn">Admin Hub</a>
+            <a href="{% url 'venue:public_map' %}" class="btn-secondary fs-btn">Live Floor Map</a>
+        </div>
+    </div>
+
+    {% if not is_approved_staff %}
+        <div class="alert-box alert-error" role="status">
+            <div>
+                <strong>Gatekeeper Lock:</strong> Your staff account is not yet <strong>APPROVED</strong>.
+                Creating or updating reservations is disabled until a Super Admin verifies your account in
+                <a href="{% url 'staff:vetting' %}" class="nav-link">Staff Vetting</a>.
+            </div>
+        </div>
+    {% endif %}
+
+    <section class="res-panel" aria-labelledby="new-reservation-heading">
+        <h2 id="new-reservation-heading" style="font-size: 1.05rem; margin-bottom: 1rem; color: var(--accent-cyan);">
+            Create Staff-Authored Reservation
+        </h2>
+        <form method="post" action="{% url 'reservations:list' %}">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="create">
+            <div class="res-grid">
+                <div class="form-group">
+                    <label class="form-label" for="{{ form.table.id_for_label }}">Table</label>
+                    {{ form.table }}
+                    {% if form.table.errors %}<ul class="field-error-text">{{ form.table.errors }}</ul>{% endif %}
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="{{ form.guest_name.id_for_label }}">Guest Name</label>
+                    {{ form.guest_name }}
+                    {% if form.guest_name.errors %}<ul class="field-error-text">{{ form.guest_name.errors }}</ul>{% endif %}
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="{{ form.guest_contact.id_for_label }}">Guest Contact</label>
+                    {{ form.guest_contact }}
+                    {% if form.guest_contact.errors %}<ul class="field-error-text">{{ form.guest_contact.errors }}</ul>{% endif %}
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="{{ form.party_size.id_for_label }}">Party Size</label>
+                    {{ form.party_size }}
+                    {% if form.party_size.errors %}<ul class="field-error-text">{{ form.party_size.errors }}</ul>{% endif %}
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="{{ form.reserved_for.id_for_label }}">Reserved For</label>
+                    {{ form.reserved_for }}
+                    {% if form.reserved_for.errors %}<ul class="field-error-text">{{ form.reserved_for.errors }}</ul>{% endif %}
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="{{ form.deposit_amount.id_for_label }}">Deposit Amount (₱)</label>
+                    {{ form.deposit_amount }}
+                    {% if form.deposit_amount.errors %}<ul class="field-error-text">{{ form.deposit_amount.errors }}</ul>{% endif %}
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="{{ form.status.id_for_label }}">Reservation Status</label>
+                    {{ form.status }}
+                    {% if form.status.errors %}<ul class="field-error-text">{{ form.status.errors }}</ul>{% endif %}
+                </div>
+                <div class="form-group" style="justify-content: flex-end;">
+                    <label class="form-label checkbox-row" for="{{ form.payment_verified.id_for_label }}">
+                        {{ form.payment_verified }}
+                        <span>Payment / Deposit Verified</span>
+                    </label>
+                    {% if form.payment_verified.errors %}<ul class="field-error-text">{{ form.payment_verified.errors }}</ul>{% endif %}
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="{{ form.remarks.id_for_label }}">Remarks</label>
+                {{ form.remarks }}
+                {% if form.remarks.errors %}<ul class="field-error-text">{{ form.remarks.errors }}</ul>{% endif %}
+            </div>
+            <button type="submit" class="btn-primary" {% if not is_approved_staff %}disabled{% endif %}>
+                Save Reservation &amp; Sync Table
+            </button>
+        </form>
+    </section>
+
+    <div tabindex="0" role="region" aria-labelledby="reservations-table-caption" class="table-wrapper">
+        <table class="data-table" style="--label-2: 'Guest'; --label-3: 'Table'; --label-4: 'Schedule'; --label-5: 'Deposit'; --label-6: 'Status'; --label-7: 'Update';">
+            <caption id="reservations-table-caption">Recent Staff-Authored Reservations</caption>
+            <thead>
+                <tr>
+                    <th scope="col">Reference</th>
+                    <th scope="col">Guest</th>
+                    <th scope="col">Table</th>
+                    <th scope="col">Schedule</th>
+                    <th scope="col">Deposit</th>
+                    <th scope="col">Status</th>
+                    <th scope="col">Update</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for res in reservations %}
+                <tr>
+                    <th scope="row">
+                        <code>{{ res.reference_code }}</code>
+                        <div style="font-size: 0.75rem; font-weight: 400; color: var(--text-muted);">
+                            by {{ res.created_by.username }}
+                        </div>
+                    </th>
+                    <td>
+                        <strong>{{ res.guest_name }}</strong>
+                        <div style="font-size: 0.78rem; color: var(--text-secondary);">{{ res.guest_contact }} &bull; {{ res.party_size }} pax</div>
+                    </td>
+                    <td>
+                        <strong>{{ res.table.code }}</strong>
+                        <div style="font-size: 0.78rem; color: var(--text-secondary);">{{ res.table.zone.name }} ({{ res.table.get_status_display }})</div>
+                    </td>
+                    <td>{{ res.reserved_for|date:"Y-m-d H:i" }}</td>
+                    <td>
+                        ₱{{ res.deposit_amount|floatformat:2 }}
+                        <div style="margin-top: 0.2rem;">
+                            {% if res.payment_verified %}
+                                <span class="badge-verified">Verified</span>
+                            {% else %}
+                                <span class="badge-unverified">Pending</span>
+                            {% endif %}
+                        </div>
+                    </td>
+                    <td><strong>{{ res.get_status_display }}</strong></td>
+                    <td>
+                        <form method="post" action="{% url 'reservations:list' %}" class="inline-update-form">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="update">
+                            <input type="hidden" name="reservation_id" value="{{ res.id }}">
+                            <label class="visually-hidden" for="status-{{ res.id }}">Status for {{ res.reference_code }}</label>
+                            <select id="status-{{ res.id }}" name="status" class="form-input" {% if not is_approved_staff %}disabled{% endif %}>
+                                {% for status_key, status_label in status_choices %}
+                                    <option value="{{ status_key }}" {% if res.status == status_key %}selected{% endif %}>
+                                        {{ status_label }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                            <label class="form-label checkbox-row" style="min-height: 44px; margin: 0;">
+                                <input type="checkbox" name="payment_verified" {% if res.payment_verified %}checked{% endif %} {% if not is_approved_staff %}disabled{% endif %}>
+                                <span>Verified</span>
+                            </label>
+                            <button type="submit" class="btn-secondary fs-btn" {% if not is_approved_staff %}disabled{% endif %}>
+                                Update
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <th scope="row" colspan="7">No reservations logged yet.</th>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="nav-switch-box">
+        <a href="{% url 'home:home' %}" class="nav-link">&larr; Back to Home</a>
+    </div>
+</div>
+{% endblock %}

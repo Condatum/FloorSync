@@ -21,5 +21,6 @@ urlpatterns = [
     path('settings/', include('apps.user_settings.urls')),
     path('staff/', include('apps.staff.urls')),
     path('floor/', include('apps.venue.urls')),
+    path('reservations/', include('apps.reservations.urls')),
     path('', include('apps.home.urls')),
 ]
