@@ -1,0 +1,109 @@
+{% extends 'base.html' %}
+
+{% block title %}FloorSync — Table Status Audit Ledger{% endblock %}
+{% block card_class %}xl{% endblock %}
+
+{% block extra_head %}
+<style>
+    .audit-header {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .fs-btn {
+        min-height: 44px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    @container (width < 600px) {
+        .data-table td:nth-child(7)::before {
+            content: var(--label-7, "") ": ";
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+        .data-table td:nth-child(8)::before {
+            content: var(--label-8, "") ": ";
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div>
+    <div class="audit-header">
+        <div>
+            <h1 class="page-title">Table Status Audit Ledger</h1>
+            <p class="page-subtitle" style="margin-bottom: 0;">
+                Immutable chronological log of every table status transition across Admin Hub, Reservations, and Layout edits.
+            </p>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+            <a href="{% url 'reservations:list' %}" class="btn-secondary fs-btn">Reservations</a>
+            <a href="{% url 'venue:admin_hub' %}" class="btn-secondary fs-btn">Admin Hub</a>
+            <a href="{% url 'venue:public_map' %}" class="btn-secondary fs-btn">Live Floor Map</a>
+        </div>
+    </div>
+
+    <div tabindex="0" role="region" aria-labelledby="audit-ledger-caption" class="table-wrapper">
+        <table class="data-table" style="--label-2: 'Transition'; --label-3: 'Reservation'; --label-4: 'Source'; --label-5: 'Changed By'; --label-6: 'Timestamp'; --label-7: 'IP Address'; --label-8: 'Note';">
+            <caption id="audit-ledger-caption">TableStatusLog Audit Trail (Latest 100 Events)</caption>
+            <thead>
+                <tr>
+                    <th scope="col">Table</th>
+                    <th scope="col">Status Transition</th>
+                    <th scope="col">Reservation</th>
+                    <th scope="col">Source</th>
+                    <th scope="col">Changed By</th>
+                    <th scope="col">Changed At</th>
+                    <th scope="col">IP Address</th>
+                    <th scope="col">Note</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for log in logs %}
+                <tr>
+                    <th scope="row">
+                        {{ log.table.code }}
+                        <div style="font-size: 0.75rem; font-weight: 400; color: var(--text-muted);">{{ log.table.zone.name }}</div>
+                    </th>
+                    <td>
+                        <span>{{ log.previous_status }}</span>
+                        &rarr;
+                        <strong>{{ log.new_status }}</strong>
+                    </td>
+                    <td>
+                        {% if log.reservation %}
+                            <code>{{ log.reservation.reference_code }}</code>
+                            <div style="font-size: 0.75rem; color: var(--text-secondary);">{{ log.reservation.guest_name }}</div>
+                        {% else %}
+                            <span style="color: var(--text-muted);">&mdash;</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ log.get_source_display }}</td>
+                    <td>{% if log.changed_by %}{{ log.changed_by.username }}{% else %}System{% endif %}</td>
+                    <td>{{ log.changed_at|date:"Y-m-d H:i:s" }}</td>
+                    <td><code>{{ log.ip_address|default:"—" }}</code></td>
+                    <td>{{ log.note|default:"—" }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <th scope="row" colspan="8">No table status audit events recorded yet.</th>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="nav-switch-box">
+        <a href="{% url 'home:home' %}" class="nav-link">&larr; Back to Home</a>
+    </div>
+</div>
+{% endblock %}
