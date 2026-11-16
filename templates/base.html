@@ -194,6 +194,7 @@
             display: flex;
             align-items: center;
             gap: 0.35rem;
+            flex-wrap: wrap;
         }
 
         .feature-nav-link {
@@ -722,12 +723,22 @@
                 {% if user.is_authenticated %}
                     <nav class="feature-nav" aria-label="Primary">
                         <a href="{% url 'home:home' %}" class="feature-nav-link {% if request.resolver_match.namespace == 'home' %}active{% endif %}"{% if request.resolver_match.namespace == 'home' %} aria-current="page"{% endif %}>Home</a>
+                        <a href="{% url 'venue:public_map' %}" class="feature-nav-link {% if request.resolver_match.view_name == 'venue:public_map' %}active{% endif %}"{% if request.resolver_match.view_name == 'venue:public_map' %} aria-current="page"{% endif %}>Live Floor</a>
+                        <a href="{% url 'venue:admin_hub' %}" class="feature-nav-link {% if request.resolver_match.view_name == 'venue:admin_hub' %}active{% endif %}"{% if request.resolver_match.view_name == 'venue:admin_hub' %} aria-current="page"{% endif %}>Admin Hub</a>
+                        <a href="{% url 'reservations:list' %}" class="feature-nav-link {% if request.resolver_match.view_name == 'reservations:list' %}active{% endif %}"{% if request.resolver_match.view_name == 'reservations:list' %} aria-current="page"{% endif %}>Reservations</a>
+                        <a href="{% url 'reservations:audit' %}" class="feature-nav-link {% if request.resolver_match.view_name == 'reservations:audit' %}active{% endif %}"{% if request.resolver_match.view_name == 'reservations:audit' %} aria-current="page"{% endif %}>Audit</a>
+                        <a href="{% url 'staff:vetting' %}" class="feature-nav-link {% if request.resolver_match.namespace == 'staff' %}active{% endif %}"{% if request.resolver_match.namespace == 'staff' %} aria-current="page"{% endif %}>Staff</a>
                         <a href="{% url 'profile:profile' %}" class="feature-nav-link {% if request.resolver_match.namespace == 'profile' %}active{% endif %}"{% if request.resolver_match.namespace == 'profile' %} aria-current="page"{% endif %}>Profile</a>
                         <a href="{% url 'user_settings:settings' %}" class="feature-nav-link {% if request.resolver_match.namespace == 'user_settings' %}active{% endif %}"{% if request.resolver_match.namespace == 'user_settings' %} aria-current="page"{% endif %}>Settings</a>
                     </nav>
                     <span class="user-status">Staff: <strong>{{ user.username }}</strong></span>
                     <a href="{% url 'logout' %}" class="btn-secondary">Log Out</a>
                 {% else %}
+                    <nav class="feature-nav" aria-label="Primary">
+                        <a href="{% url 'venue:public_map' %}" class="feature-nav-link {% if request.resolver_match.view_name == 'venue:public_map' %}active{% endif %}"{% if request.resolver_match.view_name == 'venue:public_map' %} aria-current="page"{% endif %}>Live Floor</a>
+                        <a href="{% url 'feedback:study' %}" class="feature-nav-link {% if request.resolver_match.namespace == 'feedback' %}active{% endif %}"{% if request.resolver_match.namespace == 'feedback' %} aria-current="page"{% endif %}>Usability Study</a>
+                        <a href="{% url 'login:login' %}" class="feature-nav-link {% if request.resolver_match.namespace == 'login' %}active{% endif %}"{% if request.resolver_match.namespace == 'login' %} aria-current="page"{% endif %}>Staff Login</a>
+                    </nav>
                     <span class="user-status">Guest / Unauthenticated</span>
                 {% endif %}
             </div>
