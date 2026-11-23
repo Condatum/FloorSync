@@ -15,6 +15,97 @@
         margin-bottom: 1.25rem;
     }
 
+    .floor-summary-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
+        gap: 0.75rem;
+        margin-bottom: 1rem;
+    }
+
+    .floor-stat-card {
+        background: var(--bg-secondary);
+        border: 1px solid var(--bg-card-border);
+        border-radius: 10px;
+        padding: 0.75rem 0.9rem;
+    }
+
+    .floor-stat-label {
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--text-secondary);
+    }
+
+    .floor-stat-value {
+        font-size: 1.35rem;
+        font-weight: 700;
+        color: var(--text-primary);
+        line-height: 1.25;
+    }
+
+    .floor-filter-bar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-end;
+        gap: 0.75rem 1rem;
+        padding: 0.9rem 1rem;
+        margin-bottom: 1rem;
+        background: var(--bg-secondary);
+        border: 1px solid var(--bg-card-border);
+        border-radius: 10px;
+    }
+
+    .filter-field {
+        display: flex;
+        flex-direction: column;
+        gap: 0.3rem;
+        min-width: 145px;
+        flex: 1 1 145px;
+    }
+
+    .filter-field label {
+        font-size: 0.78rem;
+        font-weight: 600;
+        color: var(--text-secondary);
+    }
+
+    .filter-field select.form-input {
+        min-height: 44px;
+        padding: 0.45rem 0.7rem;
+        font-size: 0.875rem;
+    }
+
+    .filter-actions {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .sync-meta-bar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.5rem 1rem;
+        margin-bottom: 0.75rem;
+        font-size: 0.82rem;
+        color: var(--text-secondary);
+    }
+
+    .sync-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        padding: 0.25rem 0.65rem;
+        border-radius: 999px;
+        background: var(--color-success-bg);
+        border: 1px solid var(--color-success-border);
+        color: var(--color-success-text);
+        font-weight: 600;
+        font-size: 0.76rem;
+    }
+
     .legend-row {
         display: flex;
         flex-wrap: wrap;
@@ -120,13 +211,19 @@
         font: inherit;
         color: #f9fafb;
         text-align: center;
-        transition: transform 0.15s ease, box-shadow 0.15s ease;
+        transform: rotate(var(--table-rot, 0deg));
+        transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
     }
 
     .table-node:hover {
-        transform: translateY(-2px);
+        transform: rotate(var(--table-rot, 0deg)) translateY(-2px);
         box-shadow: 0 8px 18px rgba(0, 0, 0, 0.45);
+    }
+
+    .table-node[data-dimmed="true"] {
+        opacity: 0.22;
+        filter: grayscale(0.5);
     }
 
     .table-node:focus-visible,
@@ -144,24 +241,33 @@
     }
 
     .table-node.status-AVAILABLE {
-        background: rgba(16, 185, 129, 0.26);
+        background: rgba(16, 185, 129, 0.28);
         border-color: #10b981;
     }
 
     .table-node.status-RESERVED {
-        background: rgba(245, 158, 11, 0.26);
+        background: rgba(245, 158, 11, 0.28);
         border-color: #f59e0b;
     }
 
     .table-node.status-OCCUPIED {
-        background: rgba(239, 68, 68, 0.26);
+        background: rgba(239, 68, 68, 0.28);
         border-color: #ef4444;
     }
 
     .table-node.status-BLOCKED {
-        background: rgba(100, 116, 139, 0.3);
+        background: rgba(100, 116, 139, 0.32);
         border-color: #64748b;
         opacity: 0.78;
+    }
+
+    :root[data-theme="light"] .table-node {
+        color: #0f172a;
+        box-shadow: 0 3px 10px rgba(15, 23, 42, 0.12);
+    }
+
+    :root[data-theme="light"] .table-meta-mini {
+        color: #1e293b;
     }
 
     .table-code {
@@ -173,7 +279,7 @@
     .table-meta-mini {
         font-size: 0.68rem;
         color: #e2e8f0;
-        opacity: 0.9;
+        opacity: 0.92;
     }
 
     .fs-btn {
@@ -182,6 +288,15 @@
         align-items: center;
         justify-content: center;
         gap: 0.4rem;
+    }
+
+    dialog.fs-dialog:modal {
+        overscroll-behavior: contain;
+    }
+
+    dialog.fs-dialog::backdrop {
+        overflow: hidden;
+        overscroll-behavior: contain;
     }
 
     .dialog-meta-grid {
@@ -220,7 +335,7 @@
 {% endblock %}
 
 {% block content %}
-<div>
+<div data-floor-map-root data-status-api="{% url 'venue:status_api' %}">
     <div class="floor-header-bar">
         <div>
             <h1 class="page-title">{{ venue.name }} &mdash; {{ floor_plan.name }}</h1>
@@ -238,16 +353,84 @@
         </div>
     </div>
 
-    <div class="alert-box alert-info" role="status">
+    <div class="alert-box alert-info" role="status" id="concierge-desk-banner">
         <div>
             <strong>Concierge Desk:</strong>
-            {% if active_shift %}
-                <strong>{{ active_shift.staff.username }}</strong> is currently on floor duty
-                {% if active_channel %}via {{ active_channel.get_channel_type_display }}{% endif %}.
-            {% else %}
-                No active shift &mdash; inquiries route directly to the venue hotline ({{ venue.hotline }}).
-            {% endif %}
-            <a href="{{ general_deeplink }}" class="nav-link" target="_blank" rel="noopener">General Inquiry &nearr;</a>
+            <span id="concierge-desk-text">
+                {% if active_shift %}
+                    <strong>{{ active_shift.staff.username }}</strong> is currently on floor duty
+                    {% if active_channel %}via {{ active_channel.get_channel_type_display }}{% endif %}.
+                {% else %}
+                    No active shift &mdash; inquiries route directly to the venue hotline ({{ venue.hotline }}).
+                {% endif %}
+            </span>
+            <a id="concierge-general-link" href="{{ general_deeplink }}" class="nav-link" target="_blank" rel="noopener">General Inquiry &nearr;</a>
+        </div>
+    </div>
+
+    <div class="floor-summary-grid" aria-label="Live floor counts">
+        <div class="floor-stat-card">
+            <div class="floor-stat-label">Available</div>
+            <div class="floor-stat-value" id="count-available" style="color: #10b981;">{{ status_counts.available }}</div>
+        </div>
+        <div class="floor-stat-card">
+            <div class="floor-stat-label">Reserved</div>
+            <div class="floor-stat-value" id="count-reserved" style="color: #f59e0b;">{{ status_counts.reserved }}</div>
+        </div>
+        <div class="floor-stat-card">
+            <div class="floor-stat-label">Occupied</div>
+            <div class="floor-stat-value" id="count-occupied" style="color: #ef4444;">{{ status_counts.occupied }}</div>
+        </div>
+        <div class="floor-stat-card">
+            <div class="floor-stat-label">Blocked</div>
+            <div class="floor-stat-value" id="count-blocked" style="color: #94a3b8;">{{ status_counts.blocked }}</div>
+        </div>
+    </div>
+
+    <div class="floor-filter-bar" role="search" aria-label="Filter floor tables">
+        <div class="filter-field">
+            <label for="filter-zone">Zone</label>
+            <select id="filter-zone" class="form-input">
+                <option value="ALL">All Zones ({{ status_counts.total }})</option>
+                {% for z in zone_stats %}
+                    <option value="{{ z.id }}">{{ z.name }} ({{ z.available_count }}/{{ z.total_count }} open)</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="filter-field">
+            <label for="filter-status">Availability</label>
+            <select id="filter-status" class="form-input">
+                <option value="ALL">All Statuses</option>
+                <option value="AVAILABLE">Available Only</option>
+                <option value="RESERVED">Reserved</option>
+                <option value="OCCUPIED">Occupied</option>
+                <option value="BLOCKED">Blocked</option>
+            </select>
+        </div>
+        <div class="filter-field">
+            <label for="filter-capacity">Party Size</label>
+            <select id="filter-capacity" class="form-input">
+                <option value="0">Any Capacity</option>
+                <option value="2">2+ guests</option>
+                <option value="4">4+ guests</option>
+                <option value="6">6+ guests</option>
+                <option value="8">8+ guests</option>
+                <option value="10">10+ guests</option>
+            </select>
+        </div>
+        <div class="filter-actions">
+            <button type="button" id="btn-reset-filters" class="btn-secondary fs-btn">Reset</button>
+            <button type="button" id="btn-refresh-floor" class="btn-secondary fs-btn">Refresh Live Status</button>
+        </div>
+    </div>
+
+    <div class="sync-meta-bar">
+        <div id="filter-match-summary" aria-live="polite">
+            Showing all {{ status_counts.total }} visible tables.
+        </div>
+        <div style="display: inline-flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;">
+            <span class="sync-pill" id="live-sync-badge">Live Auto-Sync (15s)</span>
+            <span id="last-synced-label">Synced just now</span>
         </div>
     </div>
 
@@ -256,8 +439,11 @@
         <span class="legend-item"><span class="legend-dot" style="background: #f59e0b;"></span> Reserved</span>
         <span class="legend-item"><span class="legend-dot" style="background: #ef4444;"></span> Occupied</span>
         <span class="legend-item"><span class="legend-dot" style="background: #64748b;"></span> Blocked</span>
-        {% for zone in zones %}
-            <span class="legend-item"><span class="legend-dot" style="background: {{ zone.display_color }};"></span> {{ zone.name }}</span>
+        {% for z in zone_stats %}
+            <span class="legend-item" data-zone-badge="{{ z.id }}">
+                <span class="legend-dot" style="background: {{ z.display_color }};"></span>
+                <span>{{ z.name }} (<strong data-zone-open="{{ z.id }}">{{ z.available_count }}</strong>/{{ z.total_count }} open)</span>
+            </span>
         {% endfor %}
     </div>
 
@@ -271,15 +457,20 @@
                 <button
                     type="button"
                     class="table-node shape-{{ table.shape }} status-{{ table.status }}"
-                    style="left: calc({{ table.pos_x }} / {{ floor_plan.canvas_width }} * 100%); top: calc({{ table.pos_y }} / {{ floor_plan.canvas_height }} * 100%); width: calc({{ table.width }} / {{ floor_plan.canvas_width }} * 100%); height: calc({{ table.height }} / {{ floor_plan.canvas_height }} * 100%);"
+                    style="left: calc({{ table.pos_x }} / {{ floor_plan.canvas_width }} * 100%); top: calc({{ table.pos_y }} / {{ floor_plan.canvas_height }} * 100%); width: calc({{ table.width }} / {{ floor_plan.canvas_width }} * 100%); height: calc({{ table.height }} / {{ floor_plan.canvas_height }} * 100%); --table-rot: {{ table.rotation }}deg;"
                     data-table-trigger
+                    data-table-id="{{ table.id }}"
                     data-code="{{ table.code }}"
                     data-label="{{ table.label|default:table.code }}"
+                    data-zone-id="{{ table.zone_id }}"
                     data-zone="{{ table.zone.name }}"
+                    data-capacity-num="{{ table.capacity }}"
                     data-capacity="{{ table.capacity }} pax"
                     data-min-spend="₱{{ table.min_spend|floatformat:2 }}"
+                    data-status-code="{{ table.status }}"
                     data-status="{{ table.get_status_display }}"
                     data-perks="{{ item.perks_text }}"
+                    data-notes="{{ table.notes }}"
                     data-deeplink="{{ item.deeplink }}"
                     aria-label="Table {{ table.code }}, {{ table.zone.name }}, {{ table.capacity }} guests, {{ table.get_status_display }}"
                 >
@@ -316,10 +507,14 @@
                 <span class="dialog-meta-label">Table Perks</span>
                 <span id="dialog-table-perks" class="dialog-meta-value">—</span>
             </div>
+            <div id="dialog-notes-row" style="grid-column: 1 / -1;" hidden>
+                <span class="dialog-meta-label">Floor Notes</span>
+                <span id="dialog-table-notes" class="dialog-meta-value">—</span>
+            </div>
         </div>
 
         <div class="dialog-actions">
-            <a id="dialog-connect-link" href="#" class="btn-primary fs-btn" target="_blank" rel="noopener" style="width: auto; margin-top: 0;">
+            <a id="dialog-connect-link" href="#" class="btn-primary fs-btn" target="_blank" rel="noopener" style="width: auto; margin-top: 0;" autofocus>
                 One-Tap Connect &nearr;
             </a>
             <form method="dialog">

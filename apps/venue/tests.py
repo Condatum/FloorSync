@@ -52,6 +52,10 @@ class VenueFloorMapTests(TestCase):
         self.assertContains(response, "Nocturnal Cebu")
         self.assertContains(response, 'id="table-detail-dialog"')
         self.assertContains(response, 'closedby="any"')
+        self.assertContains(response, 'id="filter-zone"')
+        self.assertContains(response, 'id="filter-status"')
+        self.assertContains(response, 'id="filter-capacity"')
+        self.assertContains(response, reverse("venue:status_api"))
         self.assertContains(response, "tel:+639178889999")
 
         venue = Venue.objects.get(name="Nocturnal Cebu")
@@ -71,6 +75,27 @@ class VenueFloorMapTests(TestCase):
         response_with_duty = self.client.get(reverse("venue:public_map"))
         self.assertEqual(response_with_duty.status_code, 200)
         self.assertContains(response_with_duty, "https://wa.me/639171112222?text=")
+
+    def test_status_api_returns_live_counts_tables_and_concierge(self):
+        floor_plan = seed_nocturnal_cebu()
+        vip_table = Table.objects.get(zone__floor_plan=floor_plan, code="VIP-01")
+        vip_table.status = "OCCUPIED"
+        vip_table.notes = "Near main sound booth"
+        vip_table.save(update_fields=["status", "notes"])
+
+        resp = self.client.get(reverse("venue:status_api"))
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp["Cache-Control"], "no-store")
+        data = resp.json()
+        self.assertEqual(data["venue"]["name"], "Nocturnal Cebu")
+        self.assertEqual(data["counts"]["total"], 10)
+        self.assertGreaterEqual(data["counts"]["occupied"], 1)
+        self.assertEqual(len(data["zones"]), 2)
+
+        vip_payload = next(t for t in data["tables"] if t["code"] == "VIP-01")
+        self.assertEqual(vip_payload["status"], "OCCUPIED")
+        self.assertEqual(vip_payload["notes"], "Near main sound booth")
+        self.assertIn("tel:", vip_payload["deeplink"])
 
     def test_admin_hub_gatekeeper_and_single_tap_toggle_creates_log(self):
         floor_plan = seed_nocturnal_cebu()
