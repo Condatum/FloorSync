@@ -135,6 +135,38 @@ class VenueFloorMapTests(TestCase):
         self.assertEqual(log.changed_by, self.approved_staff)
         self.assertEqual(log.source, "ADMIN_HUB")
 
+    def test_admin_hub_filters_and_status_note_persistence(self):
+        floor_plan = seed_nocturnal_cebu()
+        vip_zone = Zone.objects.get(floor_plan=floor_plan, name="VIP Deck")
+        vip_table = Table.objects.get(zone=vip_zone, code="VIP-01")
+        self.client.login(username="floor_host", password="StrongPassword123!")
+
+        # Submit a status toggle with an operational audit note while filtering by zone
+        resp = self.client.post(
+            reverse("venue:admin_hub"),
+            {
+                "table_id": vip_table.id,
+                "status": "OCCUPIED",
+                "note": "Walk-in VIP group of 8",
+                "zone": str(vip_zone.id),
+            },
+        )
+        self.assertEqual(resp.status_code, 302)
+        self.assertIn(f"zone={vip_zone.id}", resp["Location"])
+
+        log = TableStatusLog.objects.get(table=vip_table, new_status="OCCUPIED")
+        self.assertEqual(log.note, "Walk-in VIP group of 8")
+
+        # Filter by zone + status + query and verify matching table & note display
+        filtered = self.client.get(
+            reverse("venue:admin_hub"),
+            {"zone": str(vip_zone.id), "status": "OCCUPIED", "q": "VIP-01"},
+        )
+        self.assertEqual(filtered.status_code, 200)
+        self.assertContains(filtered, "VIP-01")
+        self.assertContains(filtered, "Walk-in VIP group of 8")
+        self.assertNotContains(filtered, "REG-01")
+
     def test_spatial_manage_super_admin_access_control(self):
         floor_plan = seed_nocturnal_cebu()
         vip_zone = Zone.objects.get(floor_plan=floor_plan, name="VIP Deck")

@@ -1,5 +1,8 @@
+from urllib.parse import urlencode
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.db.models import Q
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
@@ -175,20 +178,36 @@ def admin_hub_view(request):
     approved = is_approved_staff(request.user)
     super_admin = is_super_admin(request.user)
 
+    selected_zone = request.GET.get("zone", "").strip()
+    selected_status = request.GET.get("status", "").strip()
+    search_query = request.GET.get("q", "").strip()
+
     if request.method == "POST":
+        next_params = {}
+        for key in ("zone", "status_filter", "q"):
+            val = request.POST.get(key, "").strip()
+            if val:
+                next_params["status" if key == "status_filter" else key] = val
+
+        def _redirect_hub():
+            base_url = redirect("venue:admin_hub").url
+            if next_params:
+                return redirect(f"{base_url}?{urlencode(next_params)}")
+            return redirect("venue:admin_hub")
+
         if not approved:
             messages.error(
                 request,
                 "Your staff account must be APPROVED by a Super Admin before updating table statuses.",
             )
-            return redirect("venue:admin_hub")
+            return _redirect_hub()
 
         table_id = request.POST.get("table_id")
         new_status = request.POST.get("status")
         valid_statuses = dict(Table.STATUSES)
         if new_status not in valid_statuses:
             messages.error(request, "Invalid table status selected.")
-            return redirect("venue:admin_hub")
+            return _redirect_hub()
 
         table = get_object_or_404(Table, pk=table_id, zone__floor_plan=floor_plan)
         previous_status = table.status
@@ -197,26 +216,48 @@ def admin_hub_view(request):
         table.status_updated_by = request.user
         table.save(update_fields=["status", "status_updated_at", "status_updated_by"])
 
+        note_text = request.POST.get("note", "").strip()[:255]
         TableStatusLog.objects.create(
             table=table,
             previous_status=previous_status,
             new_status=new_status,
             changed_by=request.user,
             source="ADMIN_HUB",
-            note=request.POST.get("note", "").strip()[:255],
+            note=note_text,
             ip_address=request.META.get("REMOTE_ADDR"),
         )
         messages.success(
             request,
             f"Table {table.code} updated: {previous_status} -> {new_status}.",
         )
-        return redirect("venue:admin_hub")
+        return _redirect_hub()
 
-    tables = (
+    all_tables_qs = (
         Table.objects.filter(zone__floor_plan=floor_plan)
         .select_related("zone", "status_updated_by")
         .order_by("zone__sort_order", "code")
     )
+    all_tables = list(all_tables_qs)
+    status_counts = {
+        "total": len(all_tables),
+        "available": sum(1 for t in all_tables if t.status == "AVAILABLE"),
+        "reserved": sum(1 for t in all_tables if t.status == "RESERVED"),
+        "occupied": sum(1 for t in all_tables if t.status == "OCCUPIED"),
+        "blocked": sum(1 for t in all_tables if t.status == "BLOCKED"),
+    }
+
+    filtered_qs = all_tables_qs
+    if selected_zone.isdigit():
+        filtered_qs = filtered_qs.filter(zone_id=int(selected_zone))
+    if selected_status in dict(Table.STATUSES):
+        filtered_qs = filtered_qs.filter(status=selected_status)
+    if search_query:
+        filtered_qs = filtered_qs.filter(
+            Q(code__icontains=search_query) | Q(label__icontains=search_query)
+        )
+
+    tables = list(filtered_qs)
+    zones = floor_plan.zones.order_by("sort_order", "id")
     recent_logs = (
         TableStatusLog.objects.filter(table__zone__floor_plan=floor_plan)
         .select_related("table", "changed_by")
@@ -229,8 +270,13 @@ def admin_hub_view(request):
         {
             "floor_plan": floor_plan,
             "venue": floor_plan.venue,
+            "zones": zones,
             "tables": tables,
             "status_choices": Table.STATUSES,
+            "status_counts": status_counts,
+            "selected_zone": selected_zone,
+            "selected_status": selected_status,
+            "search_query": search_query,
             "recent_logs": recent_logs,
             "is_approved_staff": approved,
             "is_super_admin": super_admin,
