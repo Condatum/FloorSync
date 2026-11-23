@@ -14,6 +14,65 @@
         margin-bottom: 1.5rem;
     }
 
+    .res-kpi-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 0.75rem;
+        margin-bottom: 1.25rem;
+    }
+
+    .res-kpi-card {
+        background: var(--bg-secondary);
+        border: 1px solid var(--bg-card-border);
+        border-radius: 10px;
+        padding: 0.85rem 1rem;
+    }
+
+    .res-kpi-label {
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--text-secondary);
+    }
+
+    .res-kpi-value {
+        font-size: 1.35rem;
+        font-weight: 700;
+        color: var(--text-primary);
+    }
+
+    .res-filter-form {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-end;
+        gap: 0.75rem 1rem;
+        padding: 0.9rem 1rem;
+        margin-bottom: 1.25rem;
+        background: var(--bg-secondary);
+        border: 1px solid var(--bg-card-border);
+        border-radius: 10px;
+    }
+
+    .res-filter-field {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+        min-width: 155px;
+        flex: 1 1 155px;
+    }
+
+    .res-filter-field label {
+        font-size: 0.78rem;
+        font-weight: 600;
+        color: var(--text-secondary);
+    }
+
+    .res-filter-field .form-input {
+        min-height: 44px;
+        padding: 0.45rem 0.7rem;
+        font-size: max(1rem, 0.9rem);
+    }
+
     .res-panel {
         background: var(--bg-secondary);
         border: 1px solid var(--bg-card-border);
@@ -108,11 +167,30 @@
         </div>
     {% endif %}
 
+    <div class="res-kpi-grid" aria-label="Reservation and deposit metrics">
+        <div class="res-kpi-card">
+            <div class="res-kpi-label">Active Bookings</div>
+            <div class="res-kpi-value" style="color: var(--accent-cyan);">{{ kpis.active_count }}</div>
+        </div>
+        <div class="res-kpi-card">
+            <div class="res-kpi-label">Verified Deposits</div>
+            <div class="res-kpi-value" style="color: #10b981;">₱{{ kpis.verified_deposit_total|floatformat:2 }}</div>
+        </div>
+        <div class="res-kpi-card">
+            <div class="res-kpi-label">Verified Count</div>
+            <div class="res-kpi-value">{{ kpis.verified_count }} / {{ kpis.total_count }}</div>
+        </div>
+        <div class="res-kpi-card">
+            <div class="res-kpi-label">Seated Guests</div>
+            <div class="res-kpi-value" style="color: #f59e0b;">{{ kpis.seated_guests }} pax</div>
+        </div>
+    </div>
+
     <section class="res-panel" aria-labelledby="new-reservation-heading">
         <h2 id="new-reservation-heading" style="font-size: 1.05rem; margin-bottom: 1rem; color: var(--accent-cyan);">
             Create Staff-Authored Reservation
         </h2>
-        <form method="post" action="{% url 'reservations:list' %}">
+        <form method="post" action="{% url 'reservations:list' %}" aria-labelledby="new-reservation-heading">
             {% csrf_token %}
             <input type="hidden" name="action" value="create">
             <div class="res-grid">
@@ -170,9 +248,51 @@
         </form>
     </section>
 
+    <search>
+        <form method="get" action="{% url 'reservations:list' %}" class="res-filter-form" aria-label="Filter reservations">
+            <div class="res-filter-field">
+                <label for="res-filter-q">Search Guest / Ref / Table</label>
+                <input
+                    id="res-filter-q"
+                    type="search"
+                    name="q"
+                    value="{{ search_query }}"
+                    class="form-input"
+                    placeholder="e.g. FS-, Marco, VIP-01"
+                    autocorrect="off"
+                    autocapitalize="none"
+                    spellcheck="false"
+                >
+            </div>
+            <div class="res-filter-field">
+                <label for="res-filter-status">Booking Status</label>
+                <select id="res-filter-status" name="status" class="form-input">
+                    <option value="">All Statuses</option>
+                    {% for status_key, status_label in status_choices %}
+                        <option value="{{ status_key }}" {% if selected_status == status_key %}selected{% endif %}>{{ status_label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="res-filter-field">
+                <label for="res-filter-payment">Deposit Verification</label>
+                <select id="res-filter-payment" name="payment" class="form-input">
+                    <option value="">All Deposits</option>
+                    <option value="verified" {% if selected_payment == "verified" %}selected{% endif %}>Verified Only</option>
+                    <option value="pending" {% if selected_payment == "pending" %}selected{% endif %}>Pending Only</option>
+                </select>
+            </div>
+            <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+                <button type="submit" class="btn-primary fs-btn" style="width: auto; margin-top: 0;">Apply Filters</button>
+                {% if search_query or selected_status or selected_payment %}
+                    <a href="{% url 'reservations:list' %}" class="btn-secondary fs-btn">Clear</a>
+                {% endif %}
+            </div>
+        </form>
+    </search>
+
     <div tabindex="0" role="region" aria-labelledby="reservations-table-caption" class="table-wrapper">
         <table class="data-table" style="--label-2: 'Guest'; --label-3: 'Table'; --label-4: 'Schedule'; --label-5: 'Deposit'; --label-6: 'Status'; --label-7: 'Update';">
-            <caption id="reservations-table-caption">Recent Staff-Authored Reservations</caption>
+            <caption id="reservations-table-caption">Recent Staff-Authored Reservations ({{ reservations|length }})</caption>
             <thead>
                 <tr>
                     <th scope="col">Reference</th>
