@@ -14,6 +14,38 @@
         margin-bottom: 1.5rem;
     }
 
+    .audit-filter-form {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-end;
+        gap: 0.75rem 1rem;
+        padding: 0.9rem 1rem;
+        margin-bottom: 1.25rem;
+        background: var(--bg-secondary);
+        border: 1px solid var(--bg-card-border);
+        border-radius: 10px;
+    }
+
+    .audit-filter-field {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+        min-width: 155px;
+        flex: 1 1 155px;
+    }
+
+    .audit-filter-field label {
+        font-size: 0.78rem;
+        font-weight: 600;
+        color: var(--text-secondary);
+    }
+
+    .audit-filter-field .form-input {
+        min-height: 44px;
+        padding: 0.45rem 0.7rem;
+        font-size: max(1rem, 0.9rem);
+    }
+
     .fs-btn {
         min-height: 44px;
         display: inline-flex;
@@ -46,15 +78,59 @@
             </p>
         </div>
         <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+            <a href="{% url 'reservations:audit' %}?{{ export_query }}" class="btn-primary fs-btn" style="width: auto; margin-top: 0;">Export CSV</a>
             <a href="{% url 'reservations:list' %}" class="btn-secondary fs-btn">Reservations</a>
             <a href="{% url 'venue:admin_hub' %}" class="btn-secondary fs-btn">Admin Hub</a>
             <a href="{% url 'venue:public_map' %}" class="btn-secondary fs-btn">Live Floor Map</a>
         </div>
     </div>
 
+    <search>
+        <form method="get" action="{% url 'reservations:audit' %}" class="audit-filter-form" aria-label="Filter audit logs">
+            <div class="audit-filter-field">
+                <label for="audit-filter-q">Search Table / Staff / Note</label>
+                <input
+                    id="audit-filter-q"
+                    type="search"
+                    name="q"
+                    value="{{ search_query }}"
+                    class="form-input"
+                    placeholder="e.g. VIP-01, floor_host, FS-"
+                    autocorrect="off"
+                    autocapitalize="none"
+                    spellcheck="false"
+                >
+            </div>
+            <div class="audit-filter-field">
+                <label for="audit-filter-source">Source</label>
+                <select id="audit-filter-source" name="source" class="form-input">
+                    <option value="">All Sources</option>
+                    {% for src_key, src_label in source_choices %}
+                        <option value="{{ src_key }}" {% if selected_source == src_key %}selected{% endif %}>{{ src_label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="audit-filter-field">
+                <label for="audit-filter-status">New Status</label>
+                <select id="audit-filter-status" name="status" class="form-input">
+                    <option value="">All Statuses</option>
+                    {% for st_key, st_label in table_status_choices %}
+                        <option value="{{ st_key }}" {% if selected_status == st_key %}selected{% endif %}>{{ st_label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+                <button type="submit" class="btn-primary fs-btn" style="width: auto; margin-top: 0;">Apply Filters</button>
+                {% if search_query or selected_source or selected_status %}
+                    <a href="{% url 'reservations:audit' %}" class="btn-secondary fs-btn">Clear</a>
+                {% endif %}
+            </div>
+        </form>
+    </search>
+
     <div tabindex="0" role="region" aria-labelledby="audit-ledger-caption" class="table-wrapper">
         <table class="data-table" style="--label-2: 'Transition'; --label-3: 'Reservation'; --label-4: 'Source'; --label-5: 'Changed By'; --label-6: 'Timestamp'; --label-7: 'IP Address'; --label-8: 'Note';">
-            <caption id="audit-ledger-caption">TableStatusLog Audit Trail (Latest 100 Events)</caption>
+            <caption id="audit-ledger-caption">TableStatusLog Audit Trail ({{ logs|length }} Events Shown)</caption>
             <thead>
                 <tr>
                     <th scope="col">Table</th>

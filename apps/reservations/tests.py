@@ -151,3 +151,90 @@ class ReservationsAndAuditTests(TestCase):
         self.assertContains(audit_resp, res.reference_code)
         self.assertContains(audit_resp, "Admin Hub")
         self.assertContains(audit_resp, "floor_host")
+
+    def test_reservation_filters_and_deposit_kpis(self):
+        self.client.login(username="floor_host", password="StrongPassword123!")
+        table2 = Table.objects.filter(zone__floor_plan=self.floor_plan, code="VIP-02").first()
+
+        self.client.post(
+            reverse("reservations:list"),
+            {
+                "action": "create",
+                "table": self.table.id,
+                "guest_name": "Marco Reyes",
+                "guest_contact": "+639171234567",
+                "party_size": 6,
+                "reserved_for": "2026-11-23T22:00",
+                "deposit_amount": "12000.00",
+                "payment_verified": "on",
+                "status": "SEATED",
+                "remarks": "",
+            },
+            follow=True,
+        )
+        self.client.post(
+            reverse("reservations:list"),
+            {
+                "action": "create",
+                "table": table2.id,
+                "guest_name": "Bea Santos",
+                "guest_contact": "@beasantos",
+                "party_size": 4,
+                "reserved_for": "2026-11-23T23:00",
+                "deposit_amount": "5000.00",
+                "status": "HELD",
+                "remarks": "",
+            },
+            follow=True,
+        )
+
+        # Verify KPIs and verified-only filter
+        filtered = self.client.get(
+            reverse("reservations:list"),
+            {"payment": "verified", "q": "Marco"},
+        )
+        self.assertEqual(filtered.status_code, 200)
+        self.assertEqual(len(filtered.context["reservations"]), 1)
+        self.assertContains(filtered, "₱12000.00")
+        self.assertContains(filtered, "6 pax")
+        self.assertContains(filtered, "Marco Reyes")
+        self.assertNotContains(filtered, "Bea Santos")
+
+    def test_audit_log_filters_and_csv_export(self):
+        self.client.login(username="floor_host", password="StrongPassword123!")
+        TableStatusLog.objects.create(
+            table=self.table,
+            previous_status="AVAILABLE",
+            new_status="BLOCKED",
+            changed_by=self.approved_staff,
+            source="LAYOUT_EDIT",
+            note="VIP deck setup",
+        )
+        TableStatusLog.objects.create(
+            table=self.table,
+            previous_status="BLOCKED",
+            new_status="AVAILABLE",
+            changed_by=self.approved_staff,
+            source="ADMIN_HUB",
+            note="Reopened for guests",
+        )
+
+        filtered = self.client.get(
+            reverse("reservations:audit"),
+            {"source": "LAYOUT_EDIT", "status": "BLOCKED"},
+        )
+        self.assertEqual(filtered.status_code, 200)
+        self.assertContains(filtered, "VIP deck setup")
+        self.assertNotContains(filtered, "Reopened for guests")
+
+        csv_resp = self.client.get(
+            reverse("reservations:audit"),
+            {"source": "LAYOUT_EDIT", "export": "csv"},
+        )
+        self.assertEqual(csv_resp.status_code, 200)
+        self.assertIn("text/csv", csv_resp["Content-Type"])
+        body = csv_resp.content.decode("utf-8")
+        self.assertIn("Table,Zone,Previous Status,New Status", body)
+        self.assertIn("VIP-01", body)
+        self.assertIn("VIP deck setup", body)
+        self.assertNotIn("Reopened for guests", body)
