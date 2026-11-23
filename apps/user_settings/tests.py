@@ -35,3 +35,22 @@ class UserSettingsFeatureTests(TestCase):
         settings_obj = UserSettings.objects.get(user=self.user)
         self.assertTrue(settings_obj.dark_mode)
         self.assertFalse(settings_obj.email_notifications)
+
+    def test_persisted_theme_preference_applies_across_pages(self):
+        self.client.login(username=self.test_username, password=self.test_password)
+
+        # Save dark mode enabled -> /home/ renders dark color-scheme and data-theme="dark"
+        self.client.post(reverse('user_settings:settings'), {'dark_mode': 'on'})
+        dark_home = self.client.get(reverse('home:home'))
+        self.assertContains(dark_home, 'data-theme="dark"')
+        self.assertContains(dark_home, '<meta name="color-scheme" content="dark">')
+
+        # Save dark mode disabled -> /home/ and /floor/ render light color-scheme and data-theme="light"
+        self.client.post(reverse('user_settings:settings'), {})
+        light_home = self.client.get(reverse('home:home'))
+        self.assertContains(light_home, 'data-theme="light"')
+        self.assertContains(light_home, '<meta name="color-scheme" content="light">')
+
+        light_floor = self.client.get(reverse('venue:public_map'))
+        self.assertContains(light_floor, 'data-theme="light"')
+        self.assertContains(light_floor, '<meta name="color-scheme" content="light">')
