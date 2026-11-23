@@ -1,17 +1,80 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en"{% if active_theme_attr %} data-theme="{{ active_theme_attr }}"{% endif %}>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="color-scheme" content="dark light">
+    <meta name="color-scheme" content="{{ active_color_scheme|default:'light dark' }}">
     <title>{% block title %}FloorSync — Nightlife Floor Plan & Auth{% endblock %}</title>
     <style>
         :root {
+            color-scheme: light dark;
+            --bg-primary: #f8fafc;
+            --bg-secondary: #f1f5f9;
+            --bg-card: #ffffff;
+            --bg-card-border: #cbd5e1;
+            --header-bg: rgba(255, 255, 255, 0.9);
+            --hover-surface: rgba(15, 23, 42, 0.06);
+            --badge-text: #5b21b6;
+            --nav-btn-text: #0e7490;
+            --accent-purple: #6d28d9;
+            --accent-purple-hover: #5b21b6;
+            --accent-cyan: #0e7490;
+            --text-primary: #0f172a;
+            --text-secondary: #334155;
+            --text-muted: #475569;
+            --color-success-bg: rgba(16, 185, 129, 0.12);
+            --color-success-border: #059669;
+            --color-success-text: #065f46;
+            --color-error-bg: rgba(239, 68, 68, 0.12);
+            --color-error-border: #dc2626;
+            --color-error-text: #991b1b;
+            --color-info-bg: rgba(59, 130, 246, 0.12);
+            --color-info-border: #2563eb;
+            --color-info-text: #1e40af;
+            --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            accent-color: var(--accent-purple);
+            scrollbar-color: #94a3b8 #e2e8f0;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root:not([data-theme="light"]) {
+                --bg-primary: #0a0e17;
+                --bg-secondary: #111827;
+                --bg-card: #161f30;
+                --bg-card-border: #243049;
+                --header-bg: rgba(17, 24, 39, 0.88);
+                --hover-surface: rgba(255, 255, 255, 0.06);
+                --badge-text: #c4b5fd;
+                --nav-btn-text: #67e8f9;
+                --accent-purple: #8b5cf6;
+                --accent-purple-hover: #7c3aed;
+                --accent-cyan: #06b6d4;
+                --text-primary: #f9fafb;
+                --text-secondary: #9ca3af;
+                --text-muted: #6b7280;
+                --color-success-bg: rgba(16, 185, 129, 0.15);
+                --color-success-border: #10b981;
+                --color-success-text: #6ee7b7;
+                --color-error-bg: rgba(239, 68, 68, 0.15);
+                --color-error-border: #ef4444;
+                --color-error-text: #fca5a5;
+                --color-info-bg: rgba(59, 130, 246, 0.15);
+                --color-info-border: #3b82f6;
+                --color-info-text: #93c5fd;
+                scrollbar-color: #4b5563 #111827;
+            }
+        }
+
+        :root[data-theme="dark"] {
             color-scheme: dark;
             --bg-primary: #0a0e17;
             --bg-secondary: #111827;
             --bg-card: #161f30;
             --bg-card-border: #243049;
+            --header-bg: rgba(17, 24, 39, 0.88);
+            --hover-surface: rgba(255, 255, 255, 0.06);
+            --badge-text: #c4b5fd;
+            --nav-btn-text: #67e8f9;
             --accent-purple: #8b5cf6;
             --accent-purple-hover: #7c3aed;
             --accent-cyan: #06b6d4;
@@ -27,8 +90,6 @@
             --color-info-bg: rgba(59, 130, 246, 0.15);
             --color-info-border: #3b82f6;
             --color-info-text: #93c5fd;
-            --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            accent-color: var(--accent-purple);
             scrollbar-color: #4b5563 #111827;
         }
 
@@ -38,6 +99,10 @@
             --bg-secondary: #f1f5f9;
             --bg-card: #ffffff;
             --bg-card-border: #cbd5e1;
+            --header-bg: rgba(255, 255, 255, 0.9);
+            --hover-surface: rgba(15, 23, 42, 0.06);
+            --badge-text: #5b21b6;
+            --nav-btn-text: #0e7490;
             --accent-purple: #6d28d9;
             --accent-purple-hover: #5b21b6;
             --accent-cyan: #0e7490;
@@ -56,18 +121,39 @@
             scrollbar-color: #94a3b8 #e2e8f0;
         }
 
+        :root:has(> head > meta[name="color-scheme"][content="dark"]) {
+            color-scheme: dark;
+        }
+
+        :root:has(> head > meta[name="color-scheme"][content="light"]) {
+            color-scheme: light;
+        }
+
         @supports (color: light-dark(white, black)) {
             :root {
                 --bg-primary: light-dark(#f8fafc, #0a0e17);
                 --bg-secondary: light-dark(#f1f5f9, #111827);
                 --bg-card: light-dark(#ffffff, #161f30);
                 --bg-card-border: light-dark(#cbd5e1, #243049);
+                --header-bg: light-dark(rgba(255, 255, 255, 0.9), rgba(17, 24, 39, 0.88));
+                --hover-surface: light-dark(rgba(15, 23, 42, 0.06), rgba(255, 255, 255, 0.06));
+                --badge-text: light-dark(#5b21b6, #c4b5fd);
+                --nav-btn-text: light-dark(#0e7490, #67e8f9);
                 --accent-purple: light-dark(#6d28d9, #8b5cf6);
                 --accent-purple-hover: light-dark(#5b21b6, #7c3aed);
                 --accent-cyan: light-dark(#0e7490, #06b6d4);
                 --text-primary: light-dark(#0f172a, #f9fafb);
                 --text-secondary: light-dark(#334155, #9ca3af);
                 --text-muted: light-dark(#475569, #6b7280);
+                --color-success-bg: light-dark(rgba(16, 185, 129, 0.12), rgba(16, 185, 129, 0.15));
+                --color-success-border: light-dark(#059669, #10b981);
+                --color-success-text: light-dark(#065f46, #6ee7b7);
+                --color-error-bg: light-dark(rgba(239, 68, 68, 0.12), rgba(239, 68, 68, 0.15));
+                --color-error-border: light-dark(#dc2626, #ef4444);
+                --color-error-text: light-dark(#991b1b, #fca5a5);
+                --color-info-bg: light-dark(rgba(59, 130, 246, 0.12), rgba(59, 130, 246, 0.15));
+                --color-info-border: light-dark(#2563eb, #3b82f6);
+                --color-info-text: light-dark(#1e40af, #93c5fd);
                 scrollbar-color: light-dark(#94a3b8, #4b5563) light-dark(#e2e8f0, #111827);
             }
         }
@@ -119,7 +205,7 @@
 
         /* Top Header */
         .site-header {
-            background-color: rgba(17, 24, 39, 0.85);
+            background-color: var(--header-bg);
             backdrop-filter: blur(8px);
             border-bottom: 1px solid var(--bg-card-border);
             padding: 1rem 1.5rem;
@@ -175,8 +261,8 @@
             font-size: 0.7rem;
             text-transform: uppercase;
             letter-spacing: 0.08em;
-            background: rgba(139, 92, 246, 0.2);
-            color: #c4b5fd;
+            background: rgba(139, 92, 246, 0.16);
+            color: var(--badge-text);
             border: 1px solid rgba(139, 92, 246, 0.4);
             padding: 0.2rem 0.6rem;
             border-radius: 9999px;
@@ -209,7 +295,7 @@
 
         .feature-nav-link:hover {
             color: var(--text-primary);
-            background-color: rgba(255, 255, 255, 0.06);
+            background-color: var(--hover-surface);
         }
 
         .feature-nav-link.active {
@@ -651,7 +737,7 @@
         .btn-secondary:hover {
             color: var(--text-primary);
             border-color: var(--text-muted);
-            background-color: rgba(255, 255, 255, 0.05);
+            background-color: var(--hover-surface);
         }
 
         /* Links & Navigation helpers */
@@ -674,7 +760,7 @@
         }
 
         .nav-link:hover {
-            color: #67e8f9;
+            color: var(--nav-btn-text);
             text-decoration: underline;
         }
 
@@ -684,7 +770,7 @@
             padding: 0.6rem 1.25rem;
             background: rgba(6, 182, 212, 0.12);
             border: 1px solid rgba(6, 182, 212, 0.35);
-            color: #67e8f9;
+            color: var(--nav-btn-text);
             border-radius: 8px;
             text-decoration: none;
             font-weight: 600;
@@ -694,8 +780,8 @@
 
         .nav-button-link:hover {
             background: rgba(6, 182, 212, 0.22);
-            border-color: #06b6d4;
-            color: #a5f3fc;
+            border-color: var(--accent-cyan);
+            color: var(--text-primary);
             transform: translateY(-1px);
         }
 
@@ -705,7 +791,20 @@
             padding: 1.5rem;
             font-size: 0.8rem;
             color: var(--text-muted);
-            border-top: 1px solid rgba(36, 48, 73, 0.4);
+            border-top: 1px solid var(--bg-card-border);
+        }
+
+        @media (forced-colors: active) {
+            .card-container,
+            .alert-box,
+            .btn-primary,
+            .btn-secondary {
+                border: 1px solid CanvasText;
+            }
+            :where(a:any-link, button, input, select, textarea):focus-visible {
+                outline: 3px solid Highlight;
+                outline-offset: 2px;
+            }
         }
     </style>
     {% block extra_head %}{% endblock %}
