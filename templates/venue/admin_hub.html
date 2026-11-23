@@ -14,6 +14,78 @@
         margin-bottom: 1.25rem;
     }
 
+    .hub-summary-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
+        gap: 0.75rem;
+        margin-bottom: 1.15rem;
+    }
+
+    .hub-stat-card {
+        background: var(--bg-secondary);
+        border: 1px solid var(--bg-card-border);
+        border-radius: 10px;
+        padding: 0.75rem 0.9rem;
+    }
+
+    .hub-stat-label {
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--text-secondary);
+    }
+
+    .hub-stat-value {
+        font-size: 1.35rem;
+        font-weight: 700;
+        color: var(--text-primary);
+    }
+
+    .hub-filter-form {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-end;
+        gap: 0.75rem 1rem;
+        padding: 0.9rem 1rem;
+        margin-bottom: 1.25rem;
+        background: var(--bg-secondary);
+        border: 1px solid var(--bg-card-border);
+        border-radius: 10px;
+    }
+
+    .hub-filter-field {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+        min-width: 155px;
+        flex: 1 1 155px;
+    }
+
+    .hub-filter-field label {
+        font-size: 0.78rem;
+        font-weight: 600;
+        color: var(--text-secondary);
+    }
+
+    .hub-filter-field .form-input {
+        min-height: 44px;
+        padding: 0.45rem 0.7rem;
+        font-size: max(1rem, 0.9rem);
+    }
+
+    .status-toggle-form {
+        display: flex;
+        flex-direction: column;
+        gap: 0.45rem;
+    }
+
+    .status-note-input {
+        min-height: 44px;
+        padding: 0.4rem 0.65rem;
+        font-size: 0.85rem;
+        max-width: 340px;
+    }
+
     .status-toggle-group {
         display: flex;
         flex-wrap: wrap;
@@ -76,6 +148,7 @@
         </div>
         <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
             <a href="{% url 'venue:public_map' %}" class="btn-secondary fs-btn">Live Floor Map</a>
+            <a href="{% url 'reservations:audit' %}" class="btn-secondary fs-btn">Full Audit Ledger</a>
             {% if is_super_admin %}
                 <a href="{% url 'venue:spatial_manage' %}" class="btn-secondary fs-btn">Spatial Manager</a>
             {% endif %}
@@ -92,9 +165,71 @@
         </div>
     {% endif %}
 
+    <div class="hub-summary-grid" aria-label="Floor status totals">
+        <div class="hub-stat-card">
+            <div class="hub-stat-label">Available</div>
+            <div class="hub-stat-value" style="color: #10b981;">{{ status_counts.available }}</div>
+        </div>
+        <div class="hub-stat-card">
+            <div class="hub-stat-label">Reserved</div>
+            <div class="hub-stat-value" style="color: #f59e0b;">{{ status_counts.reserved }}</div>
+        </div>
+        <div class="hub-stat-card">
+            <div class="hub-stat-label">Occupied</div>
+            <div class="hub-stat-value" style="color: #ef4444;">{{ status_counts.occupied }}</div>
+        </div>
+        <div class="hub-stat-card">
+            <div class="hub-stat-label">Blocked</div>
+            <div class="hub-stat-value" style="color: #94a3b8;">{{ status_counts.blocked }}</div>
+        </div>
+    </div>
+
+    <search>
+        <form method="get" action="{% url 'venue:admin_hub' %}" class="hub-filter-form" aria-label="Filter floor tables">
+            <div class="hub-filter-field">
+                <label for="hub-filter-q">Search Table</label>
+                <input
+                    id="hub-filter-q"
+                    type="search"
+                    name="q"
+                    value="{{ search_query }}"
+                    class="form-input"
+                    placeholder="e.g. VIP-01 or Deck"
+                    autocorrect="off"
+                    autocapitalize="none"
+                    spellcheck="false"
+                >
+            </div>
+            <div class="hub-filter-field">
+                <label for="hub-filter-zone">Zone</label>
+                <select id="hub-filter-zone" name="zone" class="form-input">
+                    <option value="">All Zones</option>
+                    {% for z in zones %}
+                        <option value="{{ z.id }}" {% if selected_zone == z.id|stringformat:"s" %}selected{% endif %}>{{ z.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="hub-filter-field">
+                <label for="hub-filter-status">Status</label>
+                <select id="hub-filter-status" name="status" class="form-input">
+                    <option value="">All Statuses</option>
+                    {% for status_key, status_label in status_choices %}
+                        <option value="{{ status_key }}" {% if selected_status == status_key %}selected{% endif %}>{{ status_label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+                <button type="submit" class="btn-primary fs-btn" style="width: auto; margin-top: 0;">Apply Filters</button>
+                {% if selected_zone or selected_status or search_query %}
+                    <a href="{% url 'venue:admin_hub' %}" class="btn-secondary fs-btn">Clear</a>
+                {% endif %}
+            </div>
+        </form>
+    </search>
+
     <div tabindex="0" role="region" aria-labelledby="hub-tables-caption" class="table-wrapper" style="margin-bottom: 1.75rem;">
         <table class="data-table" style="--label-2: 'Zone'; --label-3: 'Capacity'; --label-4: 'Min Spend'; --label-5: 'Current Status'; --label-6: 'Single-Tap Status Update';">
-            <caption id="hub-tables-caption">{{ venue.name }} ({{ floor_plan.name }}) &mdash; Live Table Controls</caption>
+            <caption id="hub-tables-caption">{{ venue.name }} ({{ floor_plan.name }}) &mdash; Showing {{ tables|length }} of {{ status_counts.total }} Tables</caption>
             <thead>
                 <tr>
                     <th scope="col">Table</th>
@@ -102,7 +237,7 @@
                     <th scope="col">Capacity</th>
                     <th scope="col">Min Spend</th>
                     <th scope="col">Current Status</th>
-                    <th scope="col">Single-Tap Status Update</th>
+                    <th scope="col">Single-Tap Status Update &amp; Note</th>
                 </tr>
             </thead>
             <tbody>
@@ -119,27 +254,42 @@
                     <td>₱{{ table.min_spend|floatformat:2 }}</td>
                     <td><strong>{{ table.get_status_display }}</strong></td>
                     <td>
-                        <form method="post" action="{% url 'venue:admin_hub' %}" class="status-toggle-group">
+                        <form method="post" action="{% url 'venue:admin_hub' %}" class="status-toggle-form">
                             {% csrf_token %}
                             <input type="hidden" name="table_id" value="{{ table.id }}">
-                            {% for status_key, status_label in status_choices %}
-                                <button
-                                    type="submit"
-                                    name="status"
-                                    value="{{ status_key }}"
-                                    class="status-btn {% if table.status == status_key %}is-active{% endif %}"
-                                    {% if not is_approved_staff %}disabled{% endif %}
-                                    aria-pressed="{% if table.status == status_key %}true{% else %}false{% endif %}"
-                                >
-                                    {{ status_label }}
-                                </button>
-                            {% endfor %}
+                            {% if selected_zone %}<input type="hidden" name="zone" value="{{ selected_zone }}">{% endif %}
+                            {% if selected_status %}<input type="hidden" name="status_filter" value="{{ selected_status }}">{% endif %}
+                            {% if search_query %}<input type="hidden" name="q" value="{{ search_query }}">{% endif %}
+                            <div class="status-toggle-group">
+                                {% for status_key, status_label in status_choices %}
+                                    <button
+                                        type="submit"
+                                        name="status"
+                                        value="{{ status_key }}"
+                                        class="status-btn {% if table.status == status_key %}is-active{% endif %}"
+                                        {% if not is_approved_staff %}disabled{% endif %}
+                                        aria-pressed="{% if table.status == status_key %}true{% else %}false{% endif %}"
+                                    >
+                                        {{ status_label }}
+                                    </button>
+                                {% endfor %}
+                            </div>
+                            <label for="note-{{ table.id }}" class="visually-hidden">Optional audit note for {{ table.code }}</label>
+                            <input
+                                id="note-{{ table.id }}"
+                                type="text"
+                                name="note"
+                                maxlength="255"
+                                class="form-input status-note-input"
+                                placeholder="Optional note (e.g. Walk-in VIP, cleaning)"
+                                {% if not is_approved_staff %}disabled{% endif %}
+                            >
                         </form>
                     </td>
                 </tr>
                 {% empty %}
                 <tr>
-                    <th scope="row" colspan="6">No tables found for this floor plan.</th>
+                    <th scope="row" colspan="6">No tables match the active filter criteria.</th>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -147,7 +297,7 @@
     </div>
 
     <div tabindex="0" role="region" aria-labelledby="hub-logs-caption" class="table-wrapper" style="margin-bottom: 1.5rem;">
-        <table class="data-table" style="--label-2: 'Transition'; --label-3: 'Changed By'; --label-4: 'Source'; --label-5: 'Timestamp';">
+        <table class="data-table" style="--label-2: 'Transition'; --label-3: 'Changed By'; --label-4: 'Source'; --label-5: 'Timestamp'; --label-6: 'Note';">
             <caption id="hub-logs-caption">Recent Table Status Audit Log</caption>
             <thead>
                 <tr>
@@ -156,6 +306,7 @@
                     <th scope="col">Changed By</th>
                     <th scope="col">Source</th>
                     <th scope="col">Timestamp</th>
+                    <th scope="col">Note</th>
                 </tr>
             </thead>
             <tbody>
@@ -166,10 +317,11 @@
                     <td>{{ log.changed_by.username|default:"System" }}</td>
                     <td>{{ log.get_source_display }}</td>
                     <td>{{ log.changed_at|date:"Y-m-d H:i:s" }}</td>
+                    <td>{{ log.note|default:"—" }}</td>
                 </tr>
                 {% empty %}
                 <tr>
-                    <th scope="row" colspan="5">No status transitions logged yet.</th>
+                    <th scope="row" colspan="6">No status transitions logged yet.</th>
                 </tr>
                 {% endfor %}
             </tbody>
