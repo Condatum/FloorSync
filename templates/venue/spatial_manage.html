@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load static %}
 
 {% block title %}FloorSync — Spatial Floor Manager{% endblock %}
 {% block card_class %}xl{% endblock %}
@@ -22,10 +23,136 @@
         margin-bottom: 1.75rem;
     }
 
+    .spatial-preview-wrap {
+        overflow-x: auto;
+        border: 1px solid var(--bg-card-border);
+        border-radius: 12px;
+        background: var(--bg-primary);
+        padding: 0.65rem;
+        margin-bottom: 1.25rem;
+    }
+
+    .spatial-preview-canvas {
+        position: relative;
+        width: 100%;
+        min-width: 640px;
+        aspect-ratio: {{ floor_plan.canvas_width }} / {{ floor_plan.canvas_height }};
+        background:
+            linear-gradient(to right, rgba(148, 163, 184, 0.08) 1px, transparent 1px),
+            linear-gradient(to bottom, rgba(148, 163, 184, 0.08) 1px, transparent 1px),
+            var(--bg-primary);
+        background-size: 40px 40px;
+        border: 1px solid var(--bg-card-border);
+        border-radius: 8px;
+        overflow: hidden;
+        cursor: crosshair;
+    }
+
+    .spatial-preview-node {
+        position: absolute;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 0.2rem;
+        border-radius: 8px;
+        border: 2px solid var(--accent-purple);
+        background: rgba(139, 92, 246, 0.22);
+        color: var(--text-primary);
+        font-size: 0.72rem;
+        font-weight: 700;
+        text-decoration: none;
+        transform: rotate(var(--table-rot, 0deg));
+    }
+
+    .spatial-preview-node.shape-CIRCLE {
+        border-radius: 9999px;
+    }
+
+    .spatial-preview-node.shape-BOOTH {
+        border-radius: 14px;
+    }
+
+    .spatial-preview-node.is-hidden-table {
+        border-style: dashed;
+        opacity: 0.55;
+    }
+
+    .spatial-active-marker {
+        position: absolute;
+        z-index: 5;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        border: 2px dashed var(--accent-cyan);
+        background: rgba(6, 182, 212, 0.28);
+        color: var(--text-primary);
+        font: inherit;
+        font-size: 0.78rem;
+        font-weight: 700;
+        border-radius: 8px;
+        cursor: grab;
+        touch-action: none;
+        -webkit-user-select: none;
+        user-select: none;
+        transform: rotate(var(--table-rot, 0deg));
+        box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.25);
+    }
+
+    .spatial-active-marker.dragging {
+        cursor: grabbing;
+    }
+
+    .spatial-active-marker.shape-CIRCLE {
+        border-radius: 9999px;
+    }
+
+    .spatial-active-marker.shape-BOOTH {
+        border-radius: 14px;
+    }
+
+    .spatial-active-marker:focus-visible {
+        outline: 3px solid var(--accent-cyan);
+        outline-offset: 2px;
+    }
+
     .spatial-grid {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
         gap: 1rem;
+    }
+
+    .color-swatch-input {
+        min-height: 44px;
+        padding: 0.25rem 0.4rem;
+        cursor: pointer;
+    }
+
+    .zone-pill-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.6rem;
+        margin-top: 1rem;
+    }
+
+    .zone-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.4rem 0.75rem;
+        border-radius: 999px;
+        background: var(--bg-card);
+        border: 1px solid var(--bg-card-border);
+        font-size: 0.82rem;
+    }
+
+    .zone-swatch {
+        width: 12px;
+        height: 12px;
+        border-radius: 999px;
+        display: inline-block;
+        forced-color-adjust: none;
     }
 
     .perks-checkbox-list ul {
@@ -57,6 +184,26 @@
         outline: 3px solid var(--accent-cyan);
         outline-offset: 2px;
     }
+
+    .btn-danger-outline {
+        min-height: 44px;
+        padding: 0.45rem 0.85rem;
+        border-radius: 8px;
+        border: 1px solid var(--color-error-border);
+        background: var(--color-error-bg);
+        color: var(--color-error-text);
+        font: inherit;
+        font-size: 0.82rem;
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+    .table-actions-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.45rem;
+        align-items: center;
+    }
 </style>
 {% endblock %}
 
@@ -72,16 +219,63 @@
         <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
             <a href="{% url 'venue:public_map' %}" class="btn-secondary fs-btn">Live Floor Map</a>
             <a href="{% url 'venue:admin_hub' %}" class="btn-secondary fs-btn">Admin Hub</a>
+            <a href="{% url 'reservations:audit' %}" class="btn-secondary fs-btn">Audit Ledger</a>
         </div>
     </div>
 
     {% if not is_super_admin %}
         <div class="alert-box alert-error" role="status">
             <div>
-                <strong>Super Admin Only:</strong> Creating or modifying spatial table coordinates and attributes is restricted to approved Super Admins.
+                <strong>Super Admin Only:</strong> Creating or modifying spatial table coordinates, zones, and attributes is restricted to approved Super Admins.
             </div>
         </div>
     {% else %}
+        <section class="spatial-form-card" aria-labelledby="spatial-preview-heading">
+            <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.75rem;">
+                <div>
+                    <h2 id="spatial-preview-heading" style="font-size: 1.05rem; color: var(--accent-cyan);">
+                        Interactive Floor Placement Canvas
+                    </h2>
+                    <p style="font-size: 0.82rem; color: var(--text-secondary);">
+                        Click anywhere on the canvas, drag the dashed placement marker, or focus it and use Arrow keys (hold Shift for 5px) to update X/Y coordinates live. Click any existing table to edit it.
+                    </p>
+                </div>
+                <div id="spatial-coords-readout" style="font-size: 0.82rem; font-weight: 600; color: var(--text-primary);"></div>
+            </div>
+
+            <div class="spatial-preview-wrap">
+                <div
+                    id="spatial-preview-canvas"
+                    class="spatial-preview-canvas"
+                    data-canvas-width="{{ floor_plan.canvas_width }}"
+                    data-canvas-height="{{ floor_plan.canvas_height }}"
+                >
+                    {% for table in tables %}
+                        {% if not editing_table or editing_table.id != table.id %}
+                        <a
+                            href="{% url 'venue:spatial_manage' %}?edit={{ table.id }}"
+                            class="spatial-preview-node shape-{{ table.shape }} {% if not table.is_visible %}is-hidden-table{% endif %}"
+                            style="left: calc({{ table.pos_x }} / {{ floor_plan.canvas_width }} * 100%); top: calc({{ table.pos_y }} / {{ floor_plan.canvas_height }} * 100%); width: calc({{ table.width }} / {{ floor_plan.canvas_width }} * 100%); height: calc({{ table.height }} / {{ floor_plan.canvas_height }} * 100%); border-color: {{ table.zone.display_color }}; --table-rot: {{ table.rotation }}deg;"
+                        >
+                            <span>{{ table.code }}</span>
+                        </a>
+                        {% endif %}
+                    {% endfor %}
+
+                    <button
+                        type="button"
+                        id="spatial-active-marker"
+                        class="spatial-active-marker"
+                        aria-label="Active table placement handle. Drag or use arrow keys to reposition."
+                        hidden
+                    >
+                        <span data-marker-code>{% if editing_table %}{{ editing_table.code }}{% else %}NEW{% endif %}</span>
+                    </button>
+                </div>
+            </div>
+            <div id="spatial-drag-announcer" class="visually-hidden" aria-live="polite"></div>
+        </section>
+
         <section class="spatial-form-card" aria-labelledby="spatial-form-heading">
             <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 1rem;">
                 <h2 id="spatial-form-heading" style="font-size: 1.05rem; color: var(--accent-cyan);">
@@ -96,8 +290,9 @@
                 {% endif %}
             </div>
 
-            <form method="post" action="{% url 'venue:spatial_manage' %}">
+            <form method="post" action="{% url 'venue:spatial_manage' %}" aria-labelledby="spatial-form-heading">
                 {% csrf_token %}
+                <input type="hidden" name="form_action" value="save_table">
                 {% if editing_table %}
                     <input type="hidden" name="table_id" value="{{ editing_table.id }}">
                 {% endif %}
@@ -138,12 +333,12 @@
                         {{ form.min_spend.errors }}
                     </div>
                     <div class="form-group">
-                        <label class="form-label" for="{{ form.pos_x.id_for_label }}">Pos X (0&ndash;1200)</label>
+                        <label class="form-label" for="{{ form.pos_x.id_for_label }}">Pos X (0&ndash;{{ floor_plan.canvas_width }})</label>
                         {{ form.pos_x }}
                         {{ form.pos_x.errors }}
                     </div>
                     <div class="form-group">
-                        <label class="form-label" for="{{ form.pos_y.id_for_label }}">Pos Y (0&ndash;800)</label>
+                        <label class="form-label" for="{{ form.pos_y.id_for_label }}">Pos Y (0&ndash;{{ floor_plan.canvas_height }})</label>
                         {{ form.pos_y }}
                         {{ form.pos_y.errors }}
                     </div>
@@ -158,9 +353,19 @@
                         {{ form.height.errors }}
                     </div>
                     <div class="form-group">
+                        <label class="form-label" for="{{ form.rotation.id_for_label }}">Rotation (&deg;)</label>
+                        {{ form.rotation }}
+                        {{ form.rotation.errors }}
+                    </div>
+                    <div class="form-group">
                         <label class="form-label" for="{{ form.status.id_for_label }}">Status</label>
                         {{ form.status }}
                         {{ form.status.errors }}
+                    </div>
+                    <div class="form-group" style="grid-column: span 2;">
+                        <label class="form-label" for="{{ form.notes.id_for_label }}">Floor Notes</label>
+                        {{ form.notes }}
+                        {{ form.notes.errors }}
                     </div>
                     <div class="form-group" style="justify-content: flex-end;">
                         <label class="form-label checkbox-row" for="{{ form.is_visible.id_for_label }}">
@@ -180,6 +385,65 @@
                     {% if editing_table %}Save Table Changes{% else %}Create Table{% endif %}
                 </button>
             </form>
+        </section>
+
+        <section class="spatial-form-card" aria-labelledby="zone-form-heading">
+            <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 1rem;">
+                <h2 id="zone-form-heading" style="font-size: 1.05rem; color: var(--accent-cyan);">
+                    {% if editing_zone %}
+                        Edit Zone: {{ editing_zone.name }}
+                    {% else %}
+                        Floor Zones ({{ zones|length }})
+                    {% endif %}
+                </h2>
+                {% if editing_zone %}
+                    <a href="{% url 'venue:spatial_manage' %}" class="btn-secondary fs-btn">Cancel Zone Edit</a>
+                {% endif %}
+            </div>
+
+            <form method="post" action="{% url 'venue:spatial_manage' %}" aria-labelledby="zone-form-heading">
+                {% csrf_token %}
+                <input type="hidden" name="form_action" value="save_zone">
+                {% if editing_zone %}
+                    <input type="hidden" name="zone_id" value="{{ editing_zone.id }}">
+                {% endif %}
+                <div class="spatial-grid">
+                    <div class="form-group">
+                        <label class="form-label" for="{{ zone_form.name.id_for_label }}">Zone Name</label>
+                        {{ zone_form.name }}
+                        {{ zone_form.name.errors }}
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="{{ zone_form.zone_type.id_for_label }}">Zone Type</label>
+                        {{ zone_form.zone_type }}
+                        {{ zone_form.zone_type.errors }}
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="{{ zone_form.display_color.id_for_label }}">Accent Color</label>
+                        {{ zone_form.display_color }}
+                        {{ zone_form.display_color.errors }}
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="{{ zone_form.sort_order.id_for_label }}">Sort Order</label>
+                        {{ zone_form.sort_order }}
+                        {{ zone_form.sort_order.errors }}
+                    </div>
+                </div>
+                <button type="submit" class="btn-secondary fs-btn" style="margin-top: 0.25rem;">
+                    {% if editing_zone %}Save Zone{% else %}Add Zone{% endif %}
+                </button>
+            </form>
+
+            <div class="zone-pill-list" aria-label="Configured zones">
+                {% for z in zones %}
+                    <span class="zone-pill">
+                        <span class="zone-swatch" style="background: {{ z.display_color }};"></span>
+                        <strong>{{ z.name }}</strong>
+                        <span style="color: var(--text-secondary);">({{ z.get_zone_type_display }})</span>
+                        <a href="{% url 'venue:spatial_manage' %}?edit_zone={{ z.id }}" class="nav-link" style="margin-left: 0.2rem;">Edit <span class="visually-hidden">{{ z.name }}</span></a>
+                    </span>
+                {% endfor %}
+            </div>
         </section>
     {% endif %}
 
@@ -202,13 +466,25 @@
                 <tr>
                     <th scope="row">{{ table.code }}</th>
                     <td>{{ table.zone.name }}</td>
-                    <td>({{ table.pos_x|floatformat:0 }}, {{ table.pos_y|floatformat:0 }})</td>
+                    <td>({{ table.pos_x|floatformat:0 }}, {{ table.pos_y|floatformat:0 }}) &bull; {{ table.rotation }}&deg;</td>
                     <td>{{ table.get_shape_display }} ({{ table.width|floatformat:0 }}&times;{{ table.height|floatformat:0 }})</td>
                     <td>{{ table.capacity }} pax &bull; ₱{{ table.min_spend|floatformat:2 }}</td>
                     <td>{% if table.is_visible %}Yes{% else %}Hidden{% endif %}</td>
                     <td>
                         {% if is_super_admin %}
-                            <a href="{% url 'venue:spatial_manage' %}?edit={{ table.id }}" class="btn-secondary fs-btn">Edit</a>
+                            <div class="table-actions-row">
+                                <a href="{% url 'venue:spatial_manage' %}?edit={{ table.id }}" class="btn-secondary fs-btn">
+                                    Edit <span class="visually-hidden">{{ table.code }}</span>
+                                </a>
+                                <form method="post" action="{% url 'venue:spatial_manage' %}">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="form_action" value="delete_table">
+                                    <input type="hidden" name="table_id" value="{{ table.id }}">
+                                    <button type="submit" class="btn-danger-outline">
+                                        Delete <span class="visually-hidden">{{ table.code }}</span>
+                                    </button>
+                                </form>
+                            </div>
                         {% else %}
                             <span style="color: var(--text-muted);">Super Admin only</span>
                         {% endif %}
@@ -227,4 +503,10 @@
         <a href="{% url 'home:home' %}" class="nav-link">&larr; Back to Home</a>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_body %}
+{% if is_super_admin %}
+<script src="{% static 'js/venue/spatial_manage.js' %}"></script>
+{% endif %}
 {% endblock %}

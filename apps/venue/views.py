@@ -2,7 +2,7 @@ from urllib.parse import urlencode
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.db.models import Q
+from django.db.models import ProtectedError, Q
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
@@ -15,8 +15,8 @@ from apps.staff.utils import (
     is_super_admin,
 )
 
-from .forms import TableForm
-from .models import FloorPlan, Table
+from .forms import TableForm, ZoneForm
+from .models import FloorPlan, Table, Zone
 from .seed import seed_nocturnal_cebu
 
 
@@ -286,7 +286,7 @@ def admin_hub_view(request):
 
 @login_required(login_url="login:login")
 def spatial_manage_view(request):
-    """Super Admin spatial table layout and attribute management."""
+    """Super Admin spatial table layout, zone management, and LAYOUT_EDIT audit logging."""
     floor_plan = _get_published_floor_plan()
     super_admin = is_super_admin(request.user)
 
@@ -295,33 +295,95 @@ def spatial_manage_view(request):
     if edit_id:
         editing_table = get_object_or_404(Table, pk=edit_id, zone__floor_plan=floor_plan)
 
+    editing_zone = None
+    edit_zone_id = request.GET.get("edit_zone")
+    if edit_zone_id:
+        editing_zone = get_object_or_404(Zone, pk=edit_zone_id, floor_plan=floor_plan)
+
+    form = TableForm(instance=editing_table, floor_plan=floor_plan)
+    zone_form = ZoneForm(instance=editing_zone, prefix="zone")
+
     if request.method == "POST":
         if not super_admin:
             messages.error(
                 request,
-                "Only approved Super Admins can create or edit floor layout tables.",
+                "Only approved Super Admins can create or edit floor layout tables or zones.",
             )
             return redirect("venue:spatial_manage")
 
-        table_id = request.POST.get("table_id")
-        instance = (
-            get_object_or_404(Table, pk=table_id, zone__floor_plan=floor_plan)
-            if table_id
-            else None
-        )
-        form = TableForm(request.POST, instance=instance, floor_plan=floor_plan)
-        if form.is_valid():
-            saved_table = form.save()
-            action_word = "Updated" if instance else "Created"
-            messages.success(
-                request,
-                f"{action_word} table {saved_table.code} ({saved_table.zone.name}).",
-            )
-            return redirect("venue:spatial_manage")
-        editing_table = instance
-    else:
-        form = TableForm(instance=editing_table, floor_plan=floor_plan)
+        form_action = request.POST.get("form_action", "save_table")
 
+        if form_action == "save_zone":
+            zone_id = request.POST.get("zone_id")
+            zone_instance = (
+                get_object_or_404(Zone, pk=zone_id, floor_plan=floor_plan)
+                if zone_id
+                else None
+            )
+            zone_form = ZoneForm(request.POST, instance=zone_instance, prefix="zone")
+            if zone_form.is_valid():
+                saved_zone = zone_form.save(commit=False)
+                saved_zone.floor_plan = floor_plan
+                saved_zone.save()
+                action_word = "Updated" if zone_instance else "Created"
+                messages.success(
+                    request,
+                    f"{action_word} zone '{saved_zone.name}' ({saved_zone.get_zone_type_display()}).",
+                )
+                return redirect("venue:spatial_manage")
+            editing_zone = zone_instance
+
+        elif form_action == "delete_table":
+            delete_id = request.POST.get("table_id")
+            target_table = get_object_or_404(Table, pk=delete_id, zone__floor_plan=floor_plan)
+            code = target_table.code
+            try:
+                target_table.delete()
+                messages.success(request, f"Removed table {code} from {floor_plan.name}.")
+            except ProtectedError:
+                messages.error(
+                    request,
+                    f"Table {code} has linked reservations and cannot be deleted. Uncheck 'Visible on Public Map' to hide it instead.",
+                )
+            return redirect("venue:spatial_manage")
+
+        else:
+            table_id = request.POST.get("table_id")
+            instance = (
+                get_object_or_404(Table, pk=table_id, zone__floor_plan=floor_plan)
+                if table_id
+                else None
+            )
+            previous_status = instance.status if instance else "NEW"
+            form = TableForm(request.POST, instance=instance, floor_plan=floor_plan)
+            if form.is_valid():
+                saved_table = form.save()
+                if instance is None or saved_table.status != previous_status:
+                    saved_table.status_updated_at = timezone.now()
+                    saved_table.status_updated_by = request.user
+                    saved_table.save(update_fields=["status_updated_at", "status_updated_by"])
+                    TableStatusLog.objects.create(
+                        table=saved_table,
+                        previous_status=previous_status,
+                        new_status=saved_table.status,
+                        changed_by=request.user,
+                        source="LAYOUT_EDIT",
+                        note=(
+                            "Table created in Spatial Floor Manager"
+                            if instance is None
+                            else "Status updated in Spatial Floor Manager"
+                        ),
+                        ip_address=request.META.get("REMOTE_ADDR"),
+                    )
+                action_word = "Updated" if instance else "Created"
+                messages.success(
+                    request,
+                    f"{action_word} table {saved_table.code} ({saved_table.zone.name}).",
+                )
+                return redirect("venue:spatial_manage")
+            editing_table = instance
+
+    zones = floor_plan.zones.order_by("sort_order", "id")
     tables = (
         Table.objects.filter(zone__floor_plan=floor_plan)
         .select_related("zone")
@@ -336,7 +398,10 @@ def spatial_manage_view(request):
             "floor_plan": floor_plan,
             "venue": floor_plan.venue,
             "form": form,
+            "zone_form": zone_form,
             "editing_table": editing_table,
+            "editing_zone": editing_zone,
+            "zones": zones,
             "tables": tables,
             "is_super_admin": super_admin,
         },
