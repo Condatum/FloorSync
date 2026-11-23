@@ -243,3 +243,47 @@ class VenueFloorMapTests(TestCase):
         self.assertEqual(created.capacity, 12)
         self.assertFalse(created.is_visible)
         self.assertEqual(created.pos_x, Decimal("295.00"))
+        self.assertTrue(
+            TableStatusLog.objects.filter(
+                table=created, previous_status="AVAILABLE", new_status="RESERVED", source="LAYOUT_EDIT"
+            ).exists()
+        )
+
+    def test_spatial_manage_zones_and_safe_delete(self):
+        floor_plan = seed_nocturnal_cebu()
+        self.client.login(username="super_admin", password="StrongPassword123!")
+
+        # Create a new Zone
+        resp = self.client.post(
+            reverse("venue:spatial_manage"),
+            {
+                "form_action": "save_zone",
+                "zone-name": "Sky Lounge",
+                "zone-zone_type": "VIP",
+                "zone-display_color": "#06b6d4",
+                "zone-sort_order": "3",
+            },
+        )
+        self.assertEqual(resp.status_code, 302)
+        new_zone = Zone.objects.get(floor_plan=floor_plan, name="Sky Lounge")
+        self.assertEqual(new_zone.display_color, "#06b6d4")
+
+        # Create an unused table and delete it safely
+        temp_table = Table.objects.create(
+            zone=new_zone,
+            code="SKY-01",
+            capacity=6,
+            pos_x=Decimal("400"),
+            pos_y=Decimal("400"),
+        )
+        del_resp = self.client.post(
+            reverse("venue:spatial_manage"),
+            {"form_action": "delete_table", "table_id": temp_table.id},
+        )
+        self.assertEqual(del_resp.status_code, 302)
+        self.assertFalse(Table.objects.filter(pk=temp_table.id).exists())
+
+        # Render page and verify interactive canvas + zone UI exist
+        page = self.client.get(reverse("venue:spatial_manage"))
+        self.assertContains(page, 'id="spatial-preview-canvas"')
+        self.assertContains(page, "Sky Lounge")

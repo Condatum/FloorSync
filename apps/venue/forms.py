@@ -23,8 +23,10 @@ class TableForm(forms.ModelForm):
             "pos_y",
             "width",
             "height",
+            "rotation",
             "status",
             "is_visible",
+            "notes",
             "perks",
         )
         widgets = {
@@ -38,17 +40,28 @@ class TableForm(forms.ModelForm):
             "pos_y": forms.NumberInput(attrs={"class": "form-input", "min": "0", "max": "800", "step": "1"}),
             "width": forms.NumberInput(attrs={"class": "form-input", "min": "30", "max": "600", "step": "1"}),
             "height": forms.NumberInput(attrs={"class": "form-input", "min": "30", "max": "600", "step": "1"}),
+            "rotation": forms.NumberInput(attrs={"class": "form-input", "min": "-180", "max": "180", "step": "5"}),
             "status": forms.Select(attrs={"class": "form-input"}),
+            "notes": forms.TextInput(
+                attrs={"class": "form-input", "placeholder": "Optional floor notes (e.g. Near DJ deck)"}
+            ),
         }
 
     def __init__(self, *args, floor_plan=None, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields["rotation"].required = False
+        if not self.is_bound and not (self.instance and self.instance.pk):
+            self.initial.setdefault("rotation", 0)
         if floor_plan is not None:
             self.fields["zone"].queryset = Zone.objects.filter(floor_plan=floor_plan).order_by(
                 "sort_order", "name"
             )
         if self.instance and self.instance.pk and not self.is_bound:
             self.initial["perks"] = self.instance.perks.values_list("pk", flat=True)
+
+    def clean_rotation(self):
+        val = self.cleaned_data.get("rotation")
+        return 0 if val is None else val
 
     def save(self, commit=True):
         table = super().save(commit=False)
@@ -60,3 +73,17 @@ class TableForm(forms.ModelForm):
             for perk in selected_perks:
                 TablePerk.objects.get_or_create(table=table, perk=perk)
         return table
+
+
+class ZoneForm(forms.ModelForm):
+    class Meta:
+        model = Zone
+        fields = ("name", "zone_type", "display_color", "sort_order")
+        widgets = {
+            "name": forms.TextInput(attrs={"class": "form-input", "placeholder": "e.g. Sky Lounge"}),
+            "zone_type": forms.Select(attrs={"class": "form-input"}),
+            "display_color": forms.TextInput(
+                attrs={"type": "color", "class": "form-input color-swatch-input"}
+            ),
+            "sort_order": forms.NumberInput(attrs={"class": "form-input", "min": "0", "max": "100"}),
+        }
