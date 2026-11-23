@@ -1,5 +1,6 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
@@ -28,22 +29,46 @@ def _get_published_floor_plan():
     return floor_plan
 
 
-def public_map_view(request):
-    """Public 2D coordinate floor map with real-time status & One-Tap Connect modal."""
-    floor_plan = _get_published_floor_plan()
-    zones = floor_plan.zones.order_by("sort_order", "id")
-    tables = (
+def _build_floor_snapshot(floor_plan):
+    zones = list(floor_plan.zones.order_by("sort_order", "id"))
+    tables = list(
         Table.objects.filter(zone__floor_plan=floor_plan, is_visible=True)
         .select_related("zone")
         .prefetch_related("perks")
         .order_by("zone__sort_order", "code")
     )
-
     active_shift, active_channel = get_active_concierge(floor_plan.venue)
     general_deeplink = build_concierge_deeplink(active_channel, venue=floor_plan.venue)
 
+    status_counts = {
+        "total": len(tables),
+        "available": 0,
+        "reserved": 0,
+        "occupied": 0,
+        "blocked": 0,
+    }
+    zone_map = {
+        z.id: {
+            "id": z.id,
+            "name": z.name,
+            "zone_type": z.zone_type,
+            "display_color": z.display_color,
+            "available_count": 0,
+            "total_count": 0,
+        }
+        for z in zones
+    }
+
     table_items = []
     for table in tables:
+        key = table.status.lower()
+        if key in status_counts:
+            status_counts[key] += 1
+        if table.zone_id in zone_map:
+            zone_map[table.zone_id]["total_count"] += 1
+            if table.status == "AVAILABLE":
+                zone_map[table.zone_id]["available_count"] += 1
+
         perk_names = [perk.name for perk in table.perks.all()]
         table_items.append(
             {
@@ -55,21 +80,92 @@ def public_map_view(request):
             }
         )
 
+    zone_stats = [zone_map[z.id] for z in zones]
+    return {
+        "zones": zones,
+        "zone_stats": zone_stats,
+        "table_items": table_items,
+        "status_counts": status_counts,
+        "active_shift": active_shift,
+        "active_channel": active_channel,
+        "general_deeplink": general_deeplink,
+    }
+
+
+def public_map_view(request):
+    """Public 2D coordinate floor map with real-time status & One-Tap Connect modal."""
+    floor_plan = _get_published_floor_plan()
+    snapshot = _build_floor_snapshot(floor_plan)
+
     return render(
         request,
         "venue/public_map.html",
         {
             "floor_plan": floor_plan,
             "venue": floor_plan.venue,
-            "zones": zones,
-            "table_items": table_items,
-            "active_shift": active_shift,
-            "active_channel": active_channel,
-            "general_deeplink": general_deeplink,
+            "zones": snapshot["zones"],
+            "zone_stats": snapshot["zone_stats"],
+            "table_items": snapshot["table_items"],
+            "status_counts": snapshot["status_counts"],
+            "active_shift": snapshot["active_shift"],
+            "active_channel": snapshot["active_channel"],
+            "general_deeplink": snapshot["general_deeplink"],
             "is_approved_staff": is_approved_staff(request.user),
             "is_super_admin": is_super_admin(request.user),
         },
     )
+
+
+def floor_status_api_view(request):
+    """Lightweight JSON endpoint powering live table status polling on /floor/."""
+    floor_plan = _get_published_floor_plan()
+    snapshot = _build_floor_snapshot(floor_plan)
+    active_shift = snapshot["active_shift"]
+    active_channel = snapshot["active_channel"]
+
+    payload = {
+        "venue": {
+            "name": floor_plan.venue.name,
+            "hotline": floor_plan.venue.hotline,
+        },
+        "floor_plan": {
+            "id": floor_plan.id,
+            "name": floor_plan.name,
+            "canvas_width": floor_plan.canvas_width,
+            "canvas_height": floor_plan.canvas_height,
+        },
+        "synced_at": timezone.now().isoformat(),
+        "counts": snapshot["status_counts"],
+        "zones": snapshot["zone_stats"],
+        "concierge": {
+            "on_duty": bool(active_shift),
+            "staff_username": active_shift.staff.username if active_shift else None,
+            "channel_display": active_channel.get_channel_type_display() if active_channel else None,
+            "general_deeplink": snapshot["general_deeplink"],
+        },
+        "tables": [
+            {
+                "id": item["obj"].id,
+                "code": item["obj"].code,
+                "label": item["obj"].label or item["obj"].code,
+                "zone_id": item["obj"].zone_id,
+                "zone_name": item["obj"].zone.name,
+                "capacity": item["obj"].capacity,
+                "min_spend": f"{item['obj'].min_spend:.2f}",
+                "shape": item["obj"].shape,
+                "rotation": item["obj"].rotation,
+                "status": item["obj"].status,
+                "status_display": item["obj"].get_status_display(),
+                "perks_text": item["perks_text"],
+                "notes": item["obj"].notes,
+                "deeplink": item["deeplink"],
+            }
+            for item in snapshot["table_items"]
+        ],
+    }
+    response = JsonResponse(payload)
+    response["Cache-Control"] = "no-store"
+    return response
 
 
 @login_required(login_url="login:login")
